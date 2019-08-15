@@ -1,0 +1,65 @@
+apply plugin: 'com.android.application'
+
+
+allprojects {
+    repositories {
+        mavenCentral()
+        google()
+        flatDir {
+            dirs '../sdk/build/outputs/aar/'
+        }
+    }
+}
+
+android {
+    compileSdkVersion 27
+    buildToolsVersion '27.0.1'
+
+    defaultConfig {
+        applicationId "com.weather.airlockSampleApp"
+        minSdkVersion 26
+        targetSdkVersion 27
+        versionCode 1
+        versionName "1.0"
+        javaCompileOptions{
+            annotationProcessorOptions{
+                includeCompileClasspath = true
+            }
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("/Users/denisvoloshin/keys/sdkSample.jks")
+            storePassword "nnazgull1"
+            keyAlias "key0"
+            keyPassword "nnazgull1"
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            testCoverageEnabled true
+        }
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.12'
+    implementation 'org.mozilla:rhino:1.7.7.1'
+    implementation 'com.android.support:support-v4:27.1.1'
+    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'com.squareup.okhttp3:okhttp:3.4.1'
+    implementation 'com.squareup.okhttp3:okhttp-urlconnection:3.4.1'
+    implementation project(path: ':sdk')
+    //compile ( name:'sdk-release', ext:'aar')
+    testImplementation 'org.robolectric:robolectric:3.1.2'
+    testImplementation 'org.khronos:opengl-api:gl1.1-android-2.1_r1'
+}
