@@ -32,7 +32,7 @@ allprojects {
 ext {
     //change to false to publish a release build
     SNAPSHOT = false
-    BUILD_NUMBER = System.getenv("BUILD_NUMBER") ?: devBuildNumber
+    BUILD_NUMBER = 2
     VERSION_MICRO_BUILD_NUMBER = 1
 
     VERSION_MAJOR_SDK = 5
