@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/airlock-sdk-android.iml" filepath="$PROJECT_DIR$/airlock-sdk-android.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sdk/sdk.iml" filepath="$PROJECT_DIR$/sdk/sdk.iml" />
+      <module fileurl="file://$PROJECT_DIR$/sdkSample/sdkSample.iml" filepath="$PROJECT_DIR$/sdkSample/sdkSample.iml" />
+    </modules>
+  </component>
+</project>

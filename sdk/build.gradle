@@ -1,6 +1,5 @@
 apply plugin: 'com.android.library'
 apply plugin: 'jacoco'
-apply from: '../referencefiles/gradlecommon/quality.gradle'
 
 
 task jacocoTestReport(type: JacocoReport, dependsOn: ['testDebugUnitTest', 'createDebugCoverageReport']) {
