@@ -15,126 +15,103 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
 
 
 /**
- * @author Denis Voloshin
+ * Created by Denis Voloshin on 01/11/2017.
  */
 
 public class AndroidPersistenceHandler extends BasePersistenceHandler {
 
-    private final static String TAG = "AndroidPersistenceHandler";
-    protected SharedPreferences instanceSharedPreferences;
 
-
-    private static final Set<String> instancePreferenceKeys = new HashSet<>(Arrays.asList(
-            new String[]{Constants.SP_LAST_CALCULATE_TIME, Constants.SP_LAST_SYNC_TIME
-            }
-    ));
-
-    private static final Set<String> instanceRuntimeFiles = new HashSet<>(Arrays.asList(
-            new String[]{Constants.SP_CURRENT_CONTEXT,
-                    Constants.SP_FIRED_NOTIFICATIONS, Constants.SP_NOTIFICATIONS_HISTORY,
-                    Constants.SP_SYNCED_FEATURES_LIST,
-                    Constants.SP_SERVER_FEATURE_LIST,
-                    Constants.SP_PRE_SYNCED_FEATURES_LIST
-            }
-    ));
-
-    public AndroidPersistenceHandler(Context context) {
-        super(context);
-        init(context);
+    public AndroidPersistenceHandler(Context c) {
+        super(c);
+        init(c);
     }
 
-    public void init(Context context, AirlockCallback callback) {
-        preferences = context.getSharedPreferences(getKey(""), android.content.Context.MODE_PRIVATE);
-        instanceSharedPreferences = context.getSharedPreferences(getKey(context.getInstanceId()), android.content.Context.MODE_PRIVATE);
-        this.context = context;
+    public void init(Context c, AirlockCallback callback) {
+        final long startTime = System.currentTimeMillis();
+        preferences = c.getSharedPreferences(Constants.SP_NAME, android.content.Context.MODE_PRIVATE);
+        Logger.log.d(TAG, "Initialization of sharedPreferences too : " + (System.currentTimeMillis() - startTime) + " millisecond");
+        context = c;
         //If first time the app starts or it is a test mock app (files dir is null) - do not read from file system
         if (isInitialized() && context.getFilesDir() != null) {
             new Thread(new AndroidPersistenceHandler.FilePreferencesReader(callback)).start();
         }
     }
 
-    public void init(Context context) {
-        this.context = context;
-        preferences = context.getSharedPreferences(Constants.SP_NAME, android.content.Context.MODE_PRIVATE);
-        instanceSharedPreferences = context.getSharedPreferences(getKey(context.getInstanceId()), android.content.Context.MODE_PRIVATE);
+
+    public void init(Context c) {
+        final long startTime = System.currentTimeMillis();
+        preferences = c.getSharedPreferences(Constants.SP_NAME, android.content.Context.MODE_PRIVATE);
+        Logger.log.d(TAG, "Initialization of sharedPreferences too : " + (System.currentTimeMillis() - startTime) + " millisecond");
+        context = c;
         //If first time the app starts or it is a test mock app (files dir is null) - do not read from file system
-        if (isInitialized() && this.context.getFilesDir() != null) {
+        if (isInitialized() && context.getFilesDir() != null) {
             new Thread(new AndroidPersistenceHandler.FilePreferencesReader(null)).start();
         }
     }
 
-    private String getKey(String key) {
-        if (instanceRuntimeFiles.contains(key)) {
-            return context.getAirlockProductName() + "-" +
-                    context.getSeasonId() + "-" + context.getAppVersion() + "-" + context.getInstanceId() + "-" + key;
-        } else {
-            return context.getAirlockProductName() + "-" + context.getSeasonId() + "-" + context.getAppVersion() + "-" + key;
-        }
-    }
-
-    public synchronized void reset(Context context) {
-        this.context = context;
-        preferences = context.getSharedPreferences(Constants.SP_NAME, android.content.Context.MODE_PRIVATE);
+    public synchronized void reset(Context c) {
+        this.context = c;
+        preferences = c.getSharedPreferences(Constants.SP_NAME, android.content.Context.MODE_PRIVATE);
         clear();
     }
 
     public void write(String key, JSONObject value) {
-        if (value != null && value.length() > 0) {
-            inMemoryPreferences.put(key, value);
-            //if it is a test mock app (files dir is null) - do not write to file system
-            if (this.context.getFilesDir() != null) {
-                new Thread(new FilePreferencesPreserver(getKey(key), value.toString())).start();
-            }
-        } else {
-            //remove data
-            inMemoryPreferences.remove(key);
-            context.deleteFile(key);
-            new Thread(new FilePreferencesPreserver(getKey(key), value.toString())).start();
-        }
-    }
-
-    public void write(String key, String value) {
-        if (filePersistPreferences.contains(key)) {
-            if (value != null && !value.isEmpty()) {
-                if (saveAsJSONPreferences.contains(key)) {
-                    try {
-                        inMemoryPreferences.put(key, new JSONObject(value));
-                    } catch (JSONException e) {
-                        Logger.log.w(TAG, "Failed to convert content of: " + key + " to JSONObject.");
-                    }
-                } else {
-                    inMemoryPreferences.put(key, value);
-                }
+        synchronized (lock) {
+            if (value != null && value.length() > 0) {
+                inMemoryPreferences.put(key, value);
                 //if it is a test mock app (files dir is null) - do not write to file system
                 if (this.context.getFilesDir() != null) {
-                    new Thread(new FilePreferencesPreserver(getKey(key), value)).start();
+                    new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value.toString())).start();
                 }
             } else {
                 //remove data
                 inMemoryPreferences.remove(key);
                 context.deleteFile(key);
-                if (filePersistPreferences.contains(key)) {
-                    new Thread(new FilePreferencesPreserver(getKey(key), value)).start();
+                new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value.toString())).start();
+            }
+        }
+    }
+
+    public void write(String key, String value) {
+        if (filePersistPreferences.contains(key)) {
+            synchronized (lock) {
+
+                if (value != null && !value.isEmpty()) {
+                    if (saveAsJSONPreferences.contains(key)) {
+                        try {
+                            inMemoryPreferences.put(key, new JSONObject(value));
+                        } catch (JSONException e) {
+                            Logger.log.w(TAG, "Failed to convert content of: " + key + " to JSONObject.");
+                        }
+                    } else {
+                        inMemoryPreferences.put(key, value);
+                    }
+                    //if it is a test mock app (files dir is null) - do not write to file system
+                    if (this.context.getFilesDir() != null) {
+                        new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value)).start();
+                    }
+                } else {
+                    //remove data
+                    inMemoryPreferences.remove(key);
+                    context.deleteFile(key);
+                    if (filePersistPreferences.contains(key)) {
+                        new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value)).start();
+                    }
                 }
             }
         } else {
+            Logger.log.d(TAG, "Write to SP  " + key + " = " + value);
             if (key.equals(Constants.SP_SEASON_ID)) {
                 updateSeasonIdAndClearRuntimeData(value);
                 return;
             }
             SharedPreferences.Editor spEditor = preferences.edit();
-            if (instancePreferenceKeys.contains(key)) {
-                spEditor = instanceSharedPreferences.edit();
-            }
             spEditor.putString(key, value);
             spEditor.apply();
         }
@@ -151,7 +128,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
             if (this.context.getFilesDir() != null) {
                 final long startTime = System.currentTimeMillis();
                 try {
-                    FileOutputStream fos = context.openFileOutput(getKey(Constants.STREAM_PREFIX + name), android.content.Context.MODE_PRIVATE);
+                    FileOutputStream fos = context.openFileOutput(Constants.STREAM_PREFIX + name, android.content.Context.MODE_PRIVATE);
                     if (fos == null) {
                         //On tests that use mock context the FileOutputStream could be null...
                         return;
@@ -171,7 +148,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
     public void deleteStream(String name) {
         //if it is a test mock app (files dir is null) - do not write to file system
         if (this.context.getFilesDir() != null) {
-            context.deleteFile(getKey(Constants.STREAM_PREFIX + name));
+            context.deleteFile(Constants.STREAM_PREFIX + name);
         }
     }
 
@@ -181,7 +158,8 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
     public JSONObject readStream(String name) {
 
         JSONObject value = null;
-        String streamValue = (String) readSinglePreferenceFromFileSystem(getKey(Constants.STREAM_PREFIX + name));
+        name = Constants.STREAM_PREFIX + name;
+        String streamValue = (String) readSinglePreferenceFromFileSystem(name);
         if (streamValue != null) {
             try {
                 value = new JSONObject(streamValue);
@@ -194,6 +172,8 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
         }
         return value;
     }
+
+
 
     @CheckForNull
     @Nullable
@@ -208,7 +188,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
             FileInputStream fis = null;
             ByteArrayOutputStream result = new ByteArrayOutputStream();
             try {
-                fis = context.openFileInput(getKey(preferenceName));
+                fis = context.openFileInput(preferenceName);
                 int fisLength = (int) fis.getChannel().size();
                 if (fisLength > 0) {
                     byte[] buffer = new byte[(int) fis.getChannel().size()];
@@ -242,12 +222,12 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
         return preferenceValue;
     }
 
-    public class FilePreferencesPreserver implements Runnable {
+    public class FilePreferencesPersister implements Runnable {
         private final String key;
         @Nullable
         private final String value;
 
-        public FilePreferencesPreserver(String key, @Nullable String value) {
+        public FilePreferencesPersister(String key, @Nullable String value) {
             this.key = key;
             this.value = value;
         }
@@ -255,7 +235,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
         public void run() {
             final long startTime = System.currentTimeMillis();
             try {
-                FileOutputStream fos = context.openFileOutput(getKey(key), android.content.Context.MODE_PRIVATE);
+                FileOutputStream fos = context.openFileOutput(key, android.content.Context.MODE_PRIVATE);
                 if (fos == null) {
                     //On tests that use mock context the FileOutputStream could be null...
                     return;
@@ -270,6 +250,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
     }
 
     private class FilePreferencesReader implements Runnable {
+
         @Nullable
         private AirlockCallback callback;
 
@@ -298,4 +279,5 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
     public void setPurchasesRandomMap(JSONObject randomMap) {
 
     }
+
 }

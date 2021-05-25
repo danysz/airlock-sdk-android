@@ -4,8 +4,8 @@ import android.app.ListFragment;
 import android.content.Context;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -20,11 +20,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.ibm.airlock.common.AirlockCallback;
-import com.ibm.airlock.common.model.Feature;
-import com.ibm.airlock.common.services.FeaturesService;
-import com.ibm.airlock.common.services.InfraAirlockService;
+import com.ibm.airlock.common.AirlockNotInitializedException;
+import com.ibm.airlock.common.data.Feature;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import org.json.JSONException;
 
@@ -34,8 +33,6 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-
-import javax.inject.Inject;
 
 
 public class FeaturesListFragment extends ListFragment {
@@ -52,12 +49,6 @@ public class FeaturesListFragment extends ListFragment {
     public FeaturesListFragment() {
         // Required empty public constructor
     }
-
-    @Inject
-    FeaturesService featuresService;
-
-    @Inject
-    InfraAirlockService infraAirlockService;
 
 
     @Override
@@ -108,50 +99,64 @@ public class FeaturesListFragment extends ListFragment {
     }
 
 
+//    @Override
+//    public void onListItemClick(ListView l, View v, int position, long id) {
+//        if (mCallback != null && adapter != null) {
+//            mCallback.onFeatureSelected(adapter.getItem(position));
+//        }
+//    }
+
+
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-
         if (context instanceof OnFeatureSelectedListener) {
             mCallback = (OnFeatureSelectedListener) context;
         } else {
             throw new RuntimeException(context.toString()
                     + " must implement OnFeatureSelectedListener");
         }
-
-        infraAirlockService.clearTimeStamps();
-        featuresService.pullFeatures(new AirlockCallback() {
-            @Override
-            public void onFailure(@NonNull Exception e) {
-                Log.e(this.getClass().getName(), "Failed to pull Airlock features");
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(getActivity().getApplicationContext(), "Failed to pull Airlock features ", Toast.LENGTH_LONG).show();
-                        }
-                    });
+        try {
+            AirlockManager.getInstance().getCacheManager().clearTimeStamps();
+            AirlockManager.getInstance().pullFeatures(new AirlockCallback() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    Log.e(this.getClass().getName(), "Failed to pull Airlock features");
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(getActivity().getApplicationContext(), "Failed to pull Airlock features ", Toast.LENGTH_LONG).show();
+                            }
+                        });
+                    }
                 }
-            }
 
-            @Override
-            public void onSuccess(@NonNull String msg) {
-                Log.d(this.getClass().getName(), "Pull features is Done");
-                if (getActivity() != null) {
-                    getActivity().runOnUiThread(new Runnable() {
-                        @Override
-                        public void run() {
-                            Toast.makeText(getActivity().getApplicationContext(), "Pull features is Done", Toast.LENGTH_SHORT).show();
-                            updateListData();
-                        }
-                    });
+                @Override
+                public void onSuccess(@NonNull String msg) {
+                    Log.d(this.getClass().getName(), "Pull features is Done");
+                    if (getActivity() != null) {
+                        getActivity().runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                Toast.makeText(getActivity().getApplicationContext(), "Pull features is Done", Toast.LENGTH_SHORT).show();
+                                updateListData();
+                            }
+                        });
+                    }
                 }
+            });
+        } catch (AirlockNotInitializedException e) {
+            Log.e(this.getClass().getName(), "Airlock pull Failed: " + e.getLocalizedMessage());
+            if (getActivity() != null) {
+                getActivity().runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Toast.makeText(getActivity().getApplicationContext(), "Failed to pull Airlock features ", Toast.LENGTH_LONG).show();
+                    }
+                });
             }
-        });
-
+        }
     }
 
     @Override
@@ -185,9 +190,9 @@ public class FeaturesListFragment extends ListFragment {
             filteredFeatures.clear();
         }
         try {
-            featuresService.calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(), featuresService.getPurchasedProductIdsForDebug());
-            featuresService.syncFeatures();
-        } catch (JSONException e) {
+            AirlockManager.getInstance().calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(), AirlockManager.getInstance().getPurchasedProductIdsForDebug());
+            AirlockManager.getInstance().syncFeatures();
+        } catch (AirlockNotInitializedException | JSONException e) {
             Toast.makeText(getActivity().getApplicationContext(), "Failed to calculate : " + e.toString(), Toast.LENGTH_LONG).show();
             Log.d(this.getClass().getName(), "Airlock calculate & Sync Failed: " + e.getLocalizedMessage());
         }
@@ -202,7 +207,7 @@ public class FeaturesListFragment extends ListFragment {
     }
 
     protected void addAllFeatures() {
-        addAllFeaturesAndSub(featuresService.getRootFeatures());
+        addAllFeaturesAndSub(AirlockManager.getInstance().getRootFeatures());
     }
 
     @Override

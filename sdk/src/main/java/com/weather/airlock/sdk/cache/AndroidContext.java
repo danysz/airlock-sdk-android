@@ -1,61 +1,28 @@
 package com.weather.airlock.sdk.cache;
 
-import com.ibm.airlock.common.cache.Context;
-import com.ibm.airlock.common.cache.SharedPreferences;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 
+import com.ibm.airlock.common.cache.Context;
+import com.ibm.airlock.common.cache.SharedPreferences;
+
 
 /**
- * @author Denis Voloshin
+ * Created by Denis Voloshin on 01/11/2017.
  */
 public class AndroidContext implements Context {
 
-    private android.content.Context context;
-    private String airlockProductName;
-    private String appVersion;
-    private String encryptionKey;
-    private String seasonId;
-    private String instanceId;
+    public android.content.Context context;
 
-    public AndroidContext(android.content.Context context, String airlockProductName, String appVersion, String encryptionKey) {
+    public AndroidContext(android.content.Context context) {
         this.context = context;
-        this.airlockProductName = airlockProductName;
-        this.appVersion = appVersion;
-        this.encryptionKey = encryptionKey;
     }
 
     public void setContext(android.content.Context context) {
         this.context = context;
-    }
-
-    @Override
-    public String getAirlockProductName() {
-        return airlockProductName;
-    }
-
-    @Override
-    public String getEncryptionKey() {
-        return encryptionKey;
-    }
-
-    @Override
-    public String getSeasonId() {
-        return null;
-    }
-
-    @Override
-    public String getInstanceId() {
-        return null;
-    }
-
-    @Override
-    public String getAppVersion() {
-        return appVersion;
     }
 
     @Override

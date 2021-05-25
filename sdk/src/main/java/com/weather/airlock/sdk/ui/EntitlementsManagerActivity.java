@@ -1,6 +1,6 @@
 package com.weather.airlock.sdk.ui;
 
-import com.ibm.airlock.common.model.Feature;
+import com.ibm.airlock.common.data.Feature;
 import com.weather.airlock.sdk.R;
 
 

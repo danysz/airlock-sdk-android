@@ -31,7 +31,11 @@
     <fields>;
 }
 
--keep public class com.weather.airlock.sdk.AndroidAirlockProductManager{
+-keep public class com.weather.airlock.sdk.AirlockManager{
+  public *;
+}
+
+-keep public class com.weather.airlock.sdk.AirlyticsConstants{
   public *;
 }
 

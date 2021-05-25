@@ -10,6 +10,11 @@
         android:allowBackup="true"
         android:label="@string/app_name"
         android:supportsRtl="true">
+
+        <service android:name="com.weather.airlytics.sessions.CloseSessionService" />
+
     </application>
+
+
 
 </manifest>

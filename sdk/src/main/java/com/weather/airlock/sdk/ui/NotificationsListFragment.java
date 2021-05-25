@@ -1,7 +1,7 @@
 package com.weather.airlock.sdk.ui;
 
 /**
- * @author Denis Voloshin on 04/09/2017.
+ * Created by Denis Voloshin on 04/09/2017.
  */
 
 import android.app.Fragment;
@@ -9,7 +9,7 @@ import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -20,25 +20,27 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.ibm.airlock.common.AirlockCallback;
+import com.ibm.airlock.common.net.AirlockDAO;
 import com.ibm.airlock.common.notifications.AirlockNotification;
-import com.ibm.airlock.common.services.InfraAirlockService;
-import com.ibm.airlock.common.services.NotificationService;
 import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.Hashtable;
 import java.util.Map;
 
-import javax.inject.Inject;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Response;
 
 
 public class NotificationsListFragment extends Fragment {
+
 
     //list of available notifications
     private ListView listView;
@@ -52,19 +54,6 @@ public class NotificationsListFragment extends Fragment {
     //current branch name, by default is 'master'
     private String[] notificationsNames;
 
-    @Inject
-    NotificationService notificationService;
-
-    @Inject
-    InfraAirlockService infraAirlockService;
-
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-    }
-
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
                              @Nullable Bundle savedInstanceState) {
@@ -75,21 +64,41 @@ public class NotificationsListFragment extends Fragment {
         //init list
         this.notifications = new Hashtable<>();
 
-        infraAirlockService.getPersistenceHandler().write(Constants.SP_LAST_NOTIFICATIONS_FULL_DOWNLOAD_TIME, "");
-        infraAirlockService.pullNotifications(new AirlockCallback() {
+        AirlockManager.getInstance().getCacheManager().getPersistenceHandler().write(Constants.SP_LAST_NOTIFICATIONS_FULL_DOWNLOAD_TIME, "");
+
+        AirlockDAO.pullNotifications(AirlockManager.getInstance().getCacheManager(),new Callback() {
             @Override
-            public void onFailure(Exception e) {
-                final String error = String.format(getResources().getString(R.string.retrieving_notifications), e.getMessage());
+            public void onFailure(Call call, IOException e) {
+                final String error = String.format(getResources().getString(R.string.retrieving_notifications), call.request().url().toString());
                 Log.e(Constants.LIB_LOG_TAG, error);
                 showToast(error);
             }
 
             @Override
-            public void onSuccess(String response) {
+            public void onResponse(Call call, Response response) throws IOException {
+                //read the response to the string
+                String responseBody;
+
+                if (response.code() == 304) {
+                    responseBody = AirlockManager.getInstance().getCacheManager().getPersistenceHandler().read(Constants.SP_NOTIFICATIONS, "");
+                } else if (response.body() == null || response.body().toString().isEmpty() || !response.isSuccessful()) {
+                    if (response.body() != null) {
+                        response.body().close();
+                    }
+                    final String warning = getResources().getString(R.string.notifications_is_empty);
+                    Log.w(Constants.LIB_LOG_TAG, warning);
+                    showToast(warning);
+                    return;
+                } else {
+                    responseBody = response.body().string();
+                }
+
+                response.close();
 
                 //parse server response,the response has to be in json format
                 try {
-                    final JSONObject notificationsFullResponse = new JSONObject(response);
+                    final JSONObject notificationsFullResponse = new JSONObject(responseBody);
+                    response.body().close();
                     if (notificationsFullResponse.isNull("notifications")) {
                         String warning = getResources().getString(R.string.notifications_is_empty);
                         Log.w(Constants.LIB_LOG_TAG, warning);
@@ -105,6 +114,8 @@ public class NotificationsListFragment extends Fragment {
                     getActivity().runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
+
+
                             notifications = generateNotificationsList(notificationsArray);
                             java.util.Set<String> keys = notifications.keySet();
                             notificationsNames = (keys.toArray(new String[keys.size()]));
@@ -118,9 +129,9 @@ public class NotificationsListFragment extends Fragment {
                                     convertView.setPadding(20, 30, 20, 30);
                                     ((TextView) convertView).setTextSize(15);
                                     String notificationName = getItem(position);
-                                    AirlockNotification notification = notificationService.getNotification(notificationName);
+                                    AirlockNotification notification = AirlockManager.getInstance().getCacheManager().getNotificationsManager().getNotification(notificationName);
                                     if (notification != null) {
-                                        if (notification.isEnabled() && notification.isProcessingEnabled()) {
+                                        if (notification.isEnabled()&&notification.isProcessingEnabled()) {
                                             ((TextView) convertView).setTextColor(Color.BLUE);
                                         } else {
                                             ((TextView) convertView).setTextColor(Color.BLACK);
@@ -138,21 +149,25 @@ public class NotificationsListFragment extends Fragment {
                             ViewGroup header = (ViewGroup) inflater.inflate(R.layout.notifications_list_header, listView, false);
                             listView.addHeaderView(header);
 
-
                             listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
                                 @Override
                                 public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                                     if (position > 0) {
-                                        AirlockNotification notification = notificationService.getNotification(notificationsNames[position - 1]);
+                                        AirlockNotification notification = AirlockManager.getInstance().getCacheManager().getNotificationsManager().getNotification(notificationsNames[position - 1]);
                                         if (notification == null) {
                                             showToast(getResources().getString(R.string.notification_not_available, notificationsNames[position - 1]));
                                             return;
                                         }
                                         //TODO: check if isAssociatedWithUserGroup logic is needed
+
+//                                        if (!notification.isEnabled()||!notification.isAssociatedWithUserGroup()){
                                         if (!notification.isEnabled()) {
                                             StringBuilder sbMessage = new StringBuilder();
                                             if (!notification.isEnabled()) {
                                                 sbMessage.append("disabled");
+//                                                if (!notification.isAssociatedWithUserGroup()){
+//                                                    sbMessage.append(" and not associated with any active user group");
+//                                                }
                                             } else {
                                                 sbMessage.append("not associated with any active user group");
                                             }
@@ -183,6 +198,7 @@ public class NotificationsListFragment extends Fragment {
         return view;
     }
 
+
     private void showToast(final String msg) {
         Log.d(this.getClass().getName(), msg);
         if (getActivity() != null) {
@@ -195,6 +211,7 @@ public class NotificationsListFragment extends Fragment {
             });
         }
     }
+
 
     private Map<String, String> generateNotificationsList(JSONArray branches) {
         Map<String, String> notificationsMap = new Hashtable<>();

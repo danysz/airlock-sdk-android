@@ -1,6 +1,6 @@
 package com.weather.airlock.sdk;
 
-import android.support.test.InstrumentationRegistry;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.ibm.airlock.common.cache.Context;
 import com.ibm.airlock.common.util.Constants;
@@ -17,12 +17,12 @@ public class AndroidRuntimeLoaderTest {
     public void readRuntimeFile() {
 
 
-        AndroidAirlockProductManager manager = AndroidAirlockProductManager.getInstance();
+        AirlockManager manager = AirlockManager.getInstance();
         MockitoAnnotations.initMocks(this);
-        Context mockedContext = Mockito.spy(new AndroidContext(InstrumentationRegistry.getContext()));
+        Context mockedContext = Mockito.spy(new AndroidContext(InstrumentationRegistry.getInstrumentation().getContext()));
 
         mockedContext.getSharedPreferences(Constants.SP_NAME, android.content.Context.MODE_PRIVATE);
-        AndroidRuntimeLoader androidRuntimeLoader = new AndroidRuntimeLoader("runtime","",InstrumentationRegistry.getContext());
+        AndroidRuntimeLoader androidRuntimeLoader = new AndroidRuntimeLoader("runtime","",InstrumentationRegistry.getInstrumentation().getContext());
         try {
             manager.initSDK(mockedContext, androidRuntimeLoader, "");
         }catch (Exception ex){
@@ -34,12 +34,12 @@ public class AndroidRuntimeLoaderTest {
     @Test
     public void readEncryptedRuntimeFile() {
 
-        AndroidAirlockProductManager manager = AndroidAirlockProductManager.getInstance();
+        AirlockManager manager = AirlockManager.getInstance();
         MockitoAnnotations.initMocks(this);
-        Context mockedContext = Mockito.spy(new AndroidContext(InstrumentationRegistry.getContext()));
+        Context mockedContext = Mockito.spy(new AndroidContext(InstrumentationRegistry.getInstrumentation().getContext()));
 
         mockedContext.getSharedPreferences(Constants.SP_NAME, android.content.Context.MODE_PRIVATE);
-        AndroidRuntimeLoader androidRuntimeLoader = new AndroidRuntimeLoader("runtime/encrypted","TNHI3XTLNXCMDIZ6",InstrumentationRegistry.getContext());
+        AndroidRuntimeLoader androidRuntimeLoader = new AndroidRuntimeLoader("runtime/encrypted","TNHI3XTLNXCMDIZ6",InstrumentationRegistry.getInstrumentation().getContext());
         try{
         manager.initSDK(mockedContext, androidRuntimeLoader, "TNHI3XTLNXCMDIZ6");
         }catch (Exception ex){

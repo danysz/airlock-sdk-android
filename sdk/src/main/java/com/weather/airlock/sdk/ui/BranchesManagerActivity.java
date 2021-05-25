@@ -1,9 +1,15 @@
 package com.weather.airlock.sdk.ui;
 
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.Map;
+
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v7.app.AppCompatActivity;
-import android.support.v7.widget.AppCompatCheckedTextView;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.AppCompatCheckedTextView;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -12,23 +18,18 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.Toast;
-
-import com.ibm.airlock.common.AirlockCallback;
-import com.ibm.airlock.common.services.BranchesService;
-import com.ibm.airlock.common.services.InfraAirlockService;
-import com.ibm.airlock.common.util.Constants;
-import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
-
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import java.util.Arrays;
-import java.util.Hashtable;
-import java.util.Map;
-
-import javax.inject.Inject;
+import com.ibm.airlock.common.cache.PersistenceHandler;
+import com.ibm.airlock.common.net.AirlockDAO;
+import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.AirlockManager;
+import com.weather.airlock.sdk.AirlyticsConstants;
+import com.weather.airlock.sdk.R;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Response;
 
 
 /**
@@ -61,11 +62,6 @@ public class BranchesManagerActivity extends AppCompatActivity {
     @Nullable
     private String selectedDevelopBranchId;
 
-    @Inject
-    BranchesService branchesService;
-
-    @Inject
-    InfraAirlockService infraAirlockService;
 
     /**
      * Called when the activity is first created.
@@ -74,8 +70,6 @@ public class BranchesManagerActivity extends AppCompatActivity {
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
         //set empty list
         setContentView(R.layout.branches_list);
 
@@ -85,18 +79,41 @@ public class BranchesManagerActivity extends AppCompatActivity {
         //init list
         this.branches = new Hashtable<>();
 
-        branchesService.getProductBranches(new AirlockCallback() {
+        AirlockDAO.pullBranches(AirlockManager.getInstance().getCacheManager(), new Callback() {
             @Override
-            public void onFailure(Exception e) {
-                final String error = String.format(getResources().getString(R.string.retrieving_branches), e.getMessage());
+            public void onFailure(Call call, IOException e) {
+                final String error = String.format(getResources().getString(R.string.retrieving_branches), call.request().url().toString());
                 Log.e(Constants.LIB_LOG_TAG, error);
                 showToast(error);
             }
 
             @Override
-            public void onSuccess(String branches) {
+            public void onResponse(Call call, Response response) throws IOException {
+                //read the response to the string
+                if (response.body() == null || response.body().toString().isEmpty() || !response.isSuccessful()) {
+
+                    if (response.body() != null) {
+                        response.body().close();
+                    }
+
+                    final String warning = getResources().getString(R.string.user_branches_is_empty);
+                    Log.w(Constants.LIB_LOG_TAG, warning);
+                    showToast(warning);
+                    return;
+                }
+
+                //parse server response,the response has to be in json format
                 try {
-                    final JSONArray branchesArray = new JSONArray(branches);
+                    final JSONObject branchesFullResponse = new JSONObject(response.body().string());
+                    response.body().close();
+                    if (branchesFullResponse.isNull("branches")) {
+                        String warning = getResources().getString(R.string.user_branches_is_empty);
+                        Log.w(Constants.LIB_LOG_TAG, warning);
+                        showToast(warning);
+                        return;
+                    }
+                    final JSONArray branchesArray = branchesFullResponse.getJSONArray("branches");
+
                     BranchesManagerActivity.this.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -129,13 +146,15 @@ public class BranchesManagerActivity extends AppCompatActivity {
                                     AppCompatCheckedTextView checkedView = (AppCompatCheckedTextView) view;
                                     if (checkedView.isChecked()) {
                                         selectedDevelopBranch = BranchesManagerActivity.this.branchNames[position - 1];
+                                        Map<String, Object> userAttributes = new HashMap<>();
+                                        userAttributes.put(AirlyticsConstants.DEV_USER_ATTRIBUTE, true);
+                                        AirlockManager.getInstance().setAirlyticsUserAttributes(userAttributes, AirlockManager.airlyticsUserAttributesSchemaVersion);
                                     }
                                 }
                             });
                         }
                     });
-                } catch (
-                        JSONException e) {
+                } catch (JSONException e) {
                     final String error = getResources().getString(R.string.user_groups_process_failed);
                     Log.e(Constants.LIB_LOG_TAG, error);
                     showToast(error);
@@ -159,43 +178,58 @@ public class BranchesManagerActivity extends AppCompatActivity {
     @Override
     public void onPause() {
         super.onPause();
+        final PersistenceHandler ph = AirlockManager.getInstance().getCacheManager().getPersistenceHandler();
 
-        final String previousBranchName = branchesService.getDevelopBranchName();
+        final String previousBranchName = ph.getDevelopBranchName();
         if (selectedDevelopBranch == null || selectedDevelopBranch.equals("")) {
-            branchesService.setDevelopBranch("");
-            branchesService.setDevelopBranchName(selectedDevelopBranch);
-            branchesService.setDevelopBranchId("");
+            ph.setDevelopBranch("");
+            ph.setDevelopBranchName(selectedDevelopBranch);
+            ph.setDevelopBranchId("");
             return;
         }
         final String selectedDevelopBranchId = branches.get(selectedDevelopBranch);
-        branchesService.getProductBranchById(branches.get(selectedDevelopBranch), new AirlockCallback() {
+        AirlockDAO.pullBranchById(AirlockManager.getInstance().getCacheManager(), branches.get(selectedDevelopBranch), new Callback() {
             @Override
-            public void onFailure(Exception e) {
-                final String error = String.format(getResources().getString(R.string.retrieving_branch_error), e.getMessage());
+            public void onFailure(Call call, IOException e) {
+                final String error = String.format(getResources().getString(R.string.retrieving_branch_error), call.request().url().toString());
                 Log.e(Constants.LIB_LOG_TAG, error);
-                branchesService.setDevelopBranchName(previousBranchName);
+                ph.setDevelopBranchName(previousBranchName);
                 showToast(error);
             }
 
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                //read the response to the string
+                if (response.body() == null || response.body().toString().isEmpty() || !response.isSuccessful()) {
 
-            public void onSuccess(String branch)  {
+                    if (response.body() != null) {
+                        response.body().close();
+                    }
+
+                    final String warning = getResources().getString(R.string.branch_is_empty);
+                    Log.w(Constants.LIB_LOG_TAG, warning);
+                    showToast(warning);
+                    ph.setDevelopBranchName(previousBranchName);
+                    return;
+                }
 
                 //parse server response,the response has to be in json format
                 try {
-                    final JSONObject branchesFullResponse = new JSONObject(branch);
-                    branchesService.setDevelopBranch(branchesFullResponse.toString());
+                    final JSONObject branchesFullResponse = new JSONObject(response.body().string());
+                    response.body().close();
+                    ph.setDevelopBranch(branchesFullResponse.toString());
                     //apply the selected branch to the master configuration
                     if (selectedDevelopBranch == null) {
                         selectedDevelopBranch = "";
                     }
-                    branchesService.setDevelopBranchName(selectedDevelopBranch);
-                    branchesService.setDevelopBranchId(selectedDevelopBranchId);
+                    ph.setDevelopBranchName(selectedDevelopBranch);
+                    ph.setDevelopBranchId(selectedDevelopBranchId);
                 } catch (JSONException e) {
                     final String error = getResources().getString(R.string.user_groups_process_failed);
                     Log.e(Constants.LIB_LOG_TAG, error);
                     showToast(error);
                     Log.e(Constants.LIB_LOG_TAG, "");
-                    branchesService.setDevelopBranchName(previousBranchName);
+                    ph.setDevelopBranchName(previousBranchName);
                 }
             }
         });
@@ -203,7 +237,7 @@ public class BranchesManagerActivity extends AppCompatActivity {
 
     private Map<String, String> generateBranchesList(JSONArray branches) {
         Map<String, String> branchesMap = new Hashtable<>();
-        selectedDevelopBranch = branchesService.getDevelopBranchName();
+        selectedDevelopBranch = AirlockManager.getInstance().getCacheManager().getPersistenceHandler().getDevelopBranchName();
         int branchesListLength = branches.length();
         for (int i = 0; i < branchesListLength; i++) {
             JSONObject branchJSON = branches.optJSONObject(i);
@@ -223,6 +257,9 @@ public class BranchesManagerActivity extends AppCompatActivity {
             listView.setItemChecked(i, false);
         }
         selectedDevelopBranch = "";
+        Map<String, Object> userAttributes = new HashMap<>();
+        userAttributes.put(AirlyticsConstants.DEV_USER_ATTRIBUTE, false);
+        AirlockManager.getInstance().setAirlyticsUserAttributes(userAttributes, AirlockManager.airlyticsUserAttributesSchemaVersion);
     }
 
     private void findViewsById() {

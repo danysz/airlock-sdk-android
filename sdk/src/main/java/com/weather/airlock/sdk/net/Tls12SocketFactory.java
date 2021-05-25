@@ -10,7 +10,7 @@ import okhttp3.TlsVersion;
 
 
 /**
- * @author Denis Voloshin
+ * Created by Denis Voloshin on 28/09/2017.
  */
 
 public class Tls12SocketFactory extends SSLSocketFactory {

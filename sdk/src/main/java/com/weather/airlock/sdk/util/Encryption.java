@@ -1,8 +1,10 @@
 package com.weather.airlock.sdk.util;
 
 /**
- * @author Denis Voloshin on 10/11/2017.
+ * Created by Denis Voloshin on 10/11/2017.
  */
+
+import android.util.Base64;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -10,24 +12,27 @@ import java.io.UnsupportedEncodingException;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
+
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
-import android.util.Base64;
-
 
 public class Encryption {
 
-    static byte[] magic = new byte[] { 0x54, 0x39, 0x71, 0x12 };
-    static byte[] version = new byte[] { 0x00, 0x01 }; // for future use
+    static byte[] magic = new byte[]{0x54, 0x39, 0x71, 0x12};
+    static byte[] version = new byte[]{0x00, 0x01}; // for future use
 
     static final int blockSize = 16;
     static final int headerSize = magic.length + version.length + blockSize;
 
-    public static byte[] getMagic() { return magic; }
+    public static byte[] getMagic() {
+        return magic;
+    }
 
-    public static byte[] getVersion() { return version; }
+    public static byte[] getVersion() {
+        return version;
+    }
 
     byte[] key;
 
@@ -108,31 +113,6 @@ public class Encryption {
         Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5PADDING");
         cipher.init(Cipher.DECRYPT_MODE, skeySpec, iv);
         return cipher.doFinal(data);
-    }
-
-    public static void main(String[] args) {
-        try {
-            String skey = "Bar12345Bar12345"; // 128 bit key
-            String plaintext = "lalala";
-            System.out.println("original: " + plaintext);
-
-            byte[] key = Encryption.fromString(skey);
-            byte[] plain = Encryption.fromString(plaintext);
-
-            Encryption e = new Encryption(key);
-            byte[] encrypted = e.encrypt(plain);
-
-            String sencrypted = Encryption.toB64(encrypted);
-            System.out.println("encrypted: " + sencrypted);
-
-            byte[] in = Encryption.fromB64(sencrypted);
-            byte[] decrypted = e.decrypt(in);
-
-            String out = Encryption.toString(decrypted);
-            System.out.println("decrypted: " + out);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
     }
 }
 

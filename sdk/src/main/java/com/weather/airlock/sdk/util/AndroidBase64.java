@@ -5,7 +5,7 @@ import com.ibm.airlock.common.util.Base64Decoder;
 
 
 /**
- * @author Denis Voloshin on 02/11/2017.
+ * Created by Denis Voloshin on 02/11/2017.
  */
 
 public class AndroidBase64 implements Base64Decoder {

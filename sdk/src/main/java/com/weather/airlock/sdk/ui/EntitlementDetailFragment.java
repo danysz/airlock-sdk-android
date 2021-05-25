@@ -1,7 +1,6 @@
 package com.weather.airlock.sdk.ui;
 
 import android.app.Fragment;
-import android.content.Context;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,18 +8,15 @@ import android.view.ViewGroup;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-import com.ibm.airlock.common.model.Entitlement;
-import com.ibm.airlock.common.model.Feature;
-import com.ibm.airlock.common.model.PurchaseOption;
-import com.ibm.airlock.common.percentage.PercentageManager;
-import com.ibm.airlock.common.services.EntitlementsService;
+import com.ibm.airlock.common.cache.PercentageManager;
+import com.ibm.airlock.common.data.Entitlement;
+import com.ibm.airlock.common.data.Feature;
+import com.ibm.airlock.common.data.PurchaseOption;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import java.util.ArrayList;
 import java.util.Collection;
-
-import javax.inject.Inject;
 
 public class EntitlementDetailFragment extends FeatureDetailsFragment {
 
@@ -30,19 +26,9 @@ public class EntitlementDetailFragment extends FeatureDetailsFragment {
     private int mPurchaseOptionsChildrenNumber;
     private String[] mPurchaseOptionsData;
 
-    @Inject
-    EntitlementsService entitlementsService;
-
     @Override
     protected void setChildrenTitle() {
         ((TextView) mainView.findViewById(R.id.children_title)).setText("Entitlements");
-    }
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
     }
 
     @Override
@@ -119,7 +105,7 @@ public class EntitlementDetailFragment extends FeatureDetailsFragment {
     }
 
     protected Feature getFeature(String name) {
-        return entitlementsService.getEntitlement(name);
+        return AirlockManager.getInstance().getEntitlement(name);
     }
 
     protected Fragment getPurchaseOptionsListFragment(String[] mOptions) {

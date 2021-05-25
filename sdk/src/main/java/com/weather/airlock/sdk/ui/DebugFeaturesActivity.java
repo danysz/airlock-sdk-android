@@ -4,30 +4,30 @@ import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.AppCompatActivity;
+
 import com.ibm.airlock.common.AirlockCallback;
-import com.ibm.airlock.common.model.Feature;
-import com.ibm.airlock.common.percentage.PercentageManager;
-import com.ibm.airlock.common.services.FeaturesService;
-import com.ibm.airlock.common.services.InfraAirlockService;
+import com.ibm.airlock.common.AirlockInvalidFileException;
+import com.ibm.airlock.common.AirlockNotInitializedException;
+import com.ibm.airlock.common.cache.PercentageManager;
+import com.ibm.airlock.common.data.Feature;
 import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.inject.Inject;
 
 
 public class DebugFeaturesActivity extends AppCompatActivity implements FeaturesListFragment.OnFeatureSelectedListener, PercentageHolder {
@@ -39,12 +39,7 @@ public class DebugFeaturesActivity extends AppCompatActivity implements Features
     int defaultFileId;
     String productVersion;
     List<String> purchasedProductIds;
-
-    @Inject
-    InfraAirlockService infraAirlockService;
-
-    @Inject
-    FeaturesService featuresService;
+    private static final String TAG = DebugFeaturesActivity.class.getName();
 
 
     private PercentageManager percentageManager;
@@ -55,11 +50,7 @@ public class DebugFeaturesActivity extends AppCompatActivity implements Features
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         setContentView(R.layout.airlock_features);
         purchasedProductIds = new ArrayList<>();
-
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-
-        percentageManager = infraAirlockService.getPercentageManager();
+        percentageManager = AirlockManager.getInstance().getCacheManager().getPercentageManager();
 
         try {
             deviceContext = new JSONObject(getIntent().getExtras().getString(Constants.DEVICE_CONTEXT));
@@ -129,59 +120,77 @@ public class DebugFeaturesActivity extends AppCompatActivity implements Features
 
 
     private void pullFeatures() {
-        featuresService.pullFeatures(new AirlockCallback() {
-            @Override
-            public void onFailure(@NonNull final Exception e) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(getApplicationContext(), "Failed to pull: " + e.toString(), Toast.LENGTH_LONG).show();
-                    }
-                });
-            }
-
-            @Override
-            public void onSuccess(String msg) {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Toast.makeText(getApplicationContext(), "Pull is Done", Toast.LENGTH_SHORT).show();
-                        listFragment.refreshAfterActivityAction();
-                        if (detailsFragment != null) {
-                            detailsFragment.setCacheClearedFlag(false);
-                            detailsFragment.refreshAfterActivityAction();
+        try {
+            AirlockManager.getInstance().pullFeatures(new AirlockCallback() {
+                @Override
+                public void onFailure(@NonNull final Exception e) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(getApplicationContext(), "Failed to pull: " + e.toString(), Toast.LENGTH_LONG).show();
                         }
-                    }
-                });
-            }
-        });
+                    });
+                }
+
+                @Override
+                public void onSuccess(String msg) {
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            Toast.makeText(getApplicationContext(), "Pull is Done", Toast.LENGTH_SHORT).show();
+                            listFragment.refreshAfterActivityAction();
+                            if (detailsFragment != null) {
+                                detailsFragment.setCacheClearedFlag(false);
+                                detailsFragment.refreshAfterActivityAction();
+                            }
+                        }
+                    });
+                }
+            });
+        } catch (final AirlockNotInitializedException e) {
+            Log.d(this.getClass().getName(), "Airlock pull Failed: " + e.getLocalizedMessage());
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    Toast.makeText(getApplicationContext(), "Failed to pull: " + "AirlockNotInitializedException", Toast.LENGTH_LONG).show();
+                }
+            });
+        }
     }
 
     private void calculateFeatures() {
         try {
-            featuresService.calculateFeatures(deviceContext, purchasedProductIds);
-            featuresService.syncFeatures();
+            AirlockManager.getInstance().calculateFeatures(deviceContext, purchasedProductIds);
+            AirlockManager.getInstance().syncFeatures();
             Toast.makeText(getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
             listFragment.refreshAfterActivityAction();
             if (detailsFragment != null) {
                 detailsFragment.refreshAfterActivityAction();
             }
+        } catch (AirlockNotInitializedException e) {
+            Toast.makeText(getApplicationContext(), "Failed to calculate: AirlockNotInitializedException", Toast.LENGTH_LONG).show();
         } catch (JSONException e) {
             Toast.makeText(getApplicationContext(), "Failed to calculate: JSONException", Toast.LENGTH_LONG).show();
         }
     }
 
     private void clearCache() {
-        infraAirlockService.getPersistenceHandler().reset(infraAirlockService.context);
-        infraAirlockService.clearRuntimeData();
-        infraAirlockService.resetSPOnNewSeasonId();
+        AirlockManager.getInstance().reset(getApplicationContext(), false);
+        AirlockManager.getInstance().getCacheManager().clearRuntimeData();
+        AirlockManager.getInstance().getCacheManager().resetSPOnNewSeasonId();
 
         try {
-            //AndroidAirlockProductManager.getInstance().initSDK(getApplicationContext(), defaultFileId, productVersion);
-            featuresService.calculateFeatures(deviceContext, featuresService.getPurchasedProductIdsForDebug());
-            featuresService.syncFeatures();
+            AirlockManager.getInstance().initSDK(getApplicationContext(), defaultFileId, productVersion);
+            AirlockManager.getInstance().calculateFeatures(deviceContext, AirlockManager.getInstance().getPurchasedProductIdsForDebug());
+            AirlockManager.getInstance().syncFeatures();
+        } catch (AirlockNotInitializedException e) {
+            Toast.makeText(getApplicationContext(), "Failed to calculate: AirlockNotInitializedException", Toast.LENGTH_LONG).show();
         } catch (JSONException e) {
             Toast.makeText(getApplicationContext(), "Failed to calculate: JSONException", Toast.LENGTH_LONG).show();
+        } catch (AirlockInvalidFileException e) {
+            Log.d(this.getClass().getName(), "Something went wrong while airlock initialization", e);
+        } catch (IOException e) {
+            Log.e(TAG, e.getMessage());
         }
         if (percentageManager.isEmpty()) {
             try {

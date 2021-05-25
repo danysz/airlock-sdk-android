@@ -1,16 +1,19 @@
 package com.weather.airlock.sdk.commons;
 
+import com.github.peterwippermann.junit4.parameterizedsuite.ParameterizedSuite;
+import com.ibm.airlock.common.test.AbstractBaseTest;
+import com.ibm.airlock.common.test.long_run.percentage.NotificationPercentageRealTest;
 
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.junit.runners.Suite;
 
 /**
- * @author Denis Voloshin
+ * Created by iditb on 26/12/17.
  */
-@RunWith(Suite.class)
+@RunWith(ParameterizedSuite.class)
 @Suite.SuiteClasses({
-        //NotificationPercentageRealTest.class,
+        NotificationPercentageRealTest.class,
         //FeaturePercentageRealTest.class,
         //StreamPercentageRealTest.class
 })
@@ -22,6 +25,6 @@ public class AndroidTestsLongRunSuite {
         return new Object[][] {{new AndroidSdkBaseTest()}};
     }
 
-    //@Parameterized.Parameter
-    //public AbstractBaseTest baseTest ;
+    @Parameterized.Parameter
+    public AbstractBaseTest baseTest ;
 }

@@ -24,7 +24,7 @@ import okhttp3.TlsVersion;
 
 
 /**
- * @author Denis Voloshin
+ * Created by Denis Voloshin on 02/11/2017.
  */
 
 public class AndroidOkHttpClientBuilder implements OkHttpClientBuilder {

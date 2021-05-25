@@ -1,26 +1,19 @@
 package com.weather.airlock.sdk.ui;
 
-import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
 
-import com.ibm.airlock.common.model.Entitlement;
-import com.ibm.airlock.common.services.EntitlementsService;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
+import com.ibm.airlock.common.data.Entitlement;
+import com.weather.airlock.sdk.AirlockManager;
 
 import java.util.Collection;
 
-import javax.inject.Inject;
-
 /**
- * @author Eitan Schreiber on 29/01/2019.
+ * Created by Eitan Schreiber on 29/01/2019.
  */
 
 public class EntitlementsListFragment extends FeaturesListFragment {
 
-
-    @Inject
-    EntitlementsService entitlementsService;
 
     public EntitlementsListFragment() {
         // Required empty public constructor
@@ -31,15 +24,8 @@ public class EntitlementsListFragment extends FeaturesListFragment {
         searchedTxtView.setHint("Search Entitlements");
     }
 
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-    }
-
     protected void addAllFeatures() {
-        Collection<Entitlement> rootPurchases = entitlementsService.getEntitlements();
+        Collection<Entitlement> rootPurchases = AirlockManager.getInstance().getEntitlements();
         for (Entitlement entitlement : rootPurchases) {
             addEntitlement(entitlement);
         }

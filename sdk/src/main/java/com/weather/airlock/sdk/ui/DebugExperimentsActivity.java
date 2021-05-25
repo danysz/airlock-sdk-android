@@ -4,22 +4,16 @@ import android.app.FragmentManager;
 import android.app.FragmentTransaction;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import androidx.appcompat.app.AppCompatActivity;
 import android.util.Log;
-
-import com.ibm.airlock.common.services.InfraAirlockService;
-import com.ibm.airlock.common.util.Constants;
-import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
-
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import javax.inject.Inject;
+import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.R;
 
 
 /**
- * @author amirle on 04/09/2017.
+ * Created by amirle on 04/09/2017.
  */
 public class DebugExperimentsActivity extends AppCompatActivity implements ExperimentsListFragment.OnExperimentSelectedListener, PercentageHolder {
 
@@ -29,32 +23,20 @@ public class DebugExperimentsActivity extends AppCompatActivity implements Exper
 
     JSONObject deviceContext;
 
-    @Inject
-    InfraAirlockService infraAirlockService;
-
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         setContentView(R.layout.airlock_experiments);
 
         try {
             deviceContext = new JSONObject(getIntent().getExtras().getString(Constants.DEVICE_CONTEXT));
         } catch (JSONException e) {
-            Log.d(this.getClass().getName(), "Failed to fetch device context " + e.getMessage());
+            Log.d(this.getClass().getName(), "Failed to fetch device context " + e.getLocalizedMessage());
         }
 
-        try {
-            listFragment = ExperimentsListFragment.newInstance(new JSONObject(infraAirlockService.getPersistenceHandler().read(Constants
-                    .JSON_FIELD_DEVICE_EXPERIMENTS_LIST, "")));
-        } catch (JSONException e) {
-            Log.e(this.getClass().getName(), "Failed to create  ExperimentsListFragment" + e.getMessage());
-        }
+        listFragment = ExperimentsListFragment.newInstance();
         FragmentManager fm = getFragmentManager();
         FragmentTransaction tr = fm.beginTransaction();
         tr.replace(R.id.experiments_content_fragment, listFragment);

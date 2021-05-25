@@ -2,8 +2,8 @@ package com.weather.airlock.sdk.ui;
 
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
-import android.support.v4.app.FragmentActivity;
+import androidx.annotation.Nullable;
+import androidx.fragment.app.FragmentActivity;
 import com.weather.airlock.sdk.R;
 
 

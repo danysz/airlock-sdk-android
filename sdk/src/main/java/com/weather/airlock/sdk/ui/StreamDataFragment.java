@@ -1,7 +1,7 @@
 package com.weather.airlock.sdk.ui;
 
 /*
-  @author Denis Voloshin on 04/09/2017.
+  Created by Denis Voloshin on 04/09/2017.
  */
 
 import android.app.Fragment;

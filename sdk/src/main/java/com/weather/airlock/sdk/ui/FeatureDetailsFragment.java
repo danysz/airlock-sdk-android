@@ -9,7 +9,7 @@ import android.graphics.Color;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.util.AttributeSet;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -25,13 +25,12 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.ibm.airlock.common.model.Feature;
-import com.ibm.airlock.common.percentage.PercentageManager;
-import com.ibm.airlock.common.services.FeaturesService;
-import com.ibm.airlock.common.services.InfraAirlockService;
+import com.ibm.airlock.common.AirlockNotInitializedException;
+import com.ibm.airlock.common.cache.PercentageManager;
+import com.ibm.airlock.common.data.Feature;
 import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -39,8 +38,6 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import javax.inject.Inject;
 
 
 /**
@@ -86,13 +83,9 @@ public class FeatureDetailsFragment extends Fragment {
 
     private PercentageManager percentageManager;
 
-    @Inject
-    InfraAirlockService infraAirlockService;
-
-    @Inject
-    FeaturesService featuresService;
-
-
+    public FeatureDetailsFragment() {
+        percentageManager = AirlockManager.getInstance().getCacheManager().getPercentageManager();
+    }
 
     protected void initArguments(Feature feature) {
         Bundle args = new Bundle();
@@ -147,8 +140,6 @@ public class FeatureDetailsFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        percentageManager = infraAirlockService.getPercentageManager();
         if (getArguments() != null) {
             mName = getArguments().getString(FEATURE_NAME);
             mPath = getArguments().getString(PATH);
@@ -186,7 +177,7 @@ public class FeatureDetailsFragment extends Fragment {
     }
 
     protected Feature getFeature(String name) {
-        return featuresService.getFeature(name);
+        return AirlockManager.getInstance().getFeature(name);
     }
 
     private void updatePercentageBar() {
@@ -220,15 +211,18 @@ public class FeatureDetailsFragment extends Fragment {
                                                     try {
                                                         //percentageSwitch.performClick();
                                                         percentageManager.setDeviceInItemPercentageRange(getSection(), mName, percentageSwitch.isChecked());
-
-                                                        featuresService.calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(),
-                                                                featuresService.getPurchasedProductIdsForDebug());
-                                                        featuresService.syncFeatures();
-                                                        Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
-                                                        updateFragment(getFeature(mName));
-                                                        updateGUI();
-                                                        mCallBack.onPercentageChanged();
-
+                                                        try {
+                                                            AirlockManager.getInstance().calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(),
+                                                                    AirlockManager.getInstance().getPurchasedProductIdsForDebug());
+                                                            AirlockManager.getInstance().syncFeatures();
+                                                            Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
+                                                            updateFragment(getFeature(mName));
+                                                            updateGUI();
+                                                            mCallBack.onPercentageChanged();
+                                                        } catch (AirlockNotInitializedException | JSONException e) {
+                                                            Toast.makeText(getActivity().getApplicationContext(), "Failed to calculate : " + e.toString(), Toast.LENGTH_LONG).show();
+                                                            Log.d(this.getClass().getName(), "Airlock calculate & Sync Failed: " + e.getLocalizedMessage());
+                                                        }
                                                     } catch (JSONException e) {
                                                         Log.w(Constants.LIB_LOG_TAG, "Error while updating Feature's random number: ", e);
                                                     }
@@ -315,9 +309,6 @@ public class FeatureDetailsFragment extends Fragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-
         if (context instanceof PercentageHolder) {
             mCallBack = (PercentageHolder) context;
         } else {
@@ -548,14 +539,17 @@ public class FeatureDetailsFragment extends Fragment {
                                                             try {
                                                                 configSwitch.performClick();
                                                                 percentageManager.setDeviceInItemPercentageRange(getSection(), configName, !state);
-
-                                                                featuresService.calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(),
-                                                                        featuresService.getPurchasedProductIdsForDebug());
-                                                                featuresService.syncFeatures();
-                                                                Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
-                                                                updateFragment(featuresService.getFeature(mName));
-                                                                updateGUI();
-
+                                                                try {
+                                                                    AirlockManager.getInstance().calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(),
+                                                                            AirlockManager.getInstance().getPurchasedProductIdsForDebug());
+                                                                    AirlockManager.getInstance().syncFeatures();
+                                                                    Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
+                                                                    updateFragment(AirlockManager.getInstance().getFeature(mName));
+                                                                    updateGUI();
+                                                                } catch (AirlockNotInitializedException | JSONException e) {
+                                                                    Toast.makeText(getActivity().getApplicationContext(), "Failed to calculate : " + e.toString(), Toast.LENGTH_LONG).show();
+                                                                    Log.d(this.getClass().getName(), "Airlock calculate & Sync Failed: " + e.getLocalizedMessage());
+                                                                }
                                                             } catch (JSONException e) {
                                                                 Log.w(Constants.LIB_LOG_TAG, "Error while updating Feature's random number: ", e);
                                                             }

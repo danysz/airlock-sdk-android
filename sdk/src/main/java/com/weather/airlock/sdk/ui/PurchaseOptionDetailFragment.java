@@ -1,7 +1,6 @@
 package com.weather.airlock.sdk.ui;
 
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.util.Log;
@@ -9,46 +8,33 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.ibm.airlock.common.model.Entitlement;
-import com.ibm.airlock.common.model.Feature;
-import com.ibm.airlock.common.model.PurchaseOption;
-import com.ibm.airlock.common.percentage.PercentageManager;
-import com.ibm.airlock.common.services.EntitlementsService;
-import com.ibm.airlock.common.services.FeaturesService;
+import com.ibm.airlock.common.AirlockNotInitializedException;
+import com.ibm.airlock.common.cache.PercentageManager;
+import com.ibm.airlock.common.data.Entitlement;
+import com.ibm.airlock.common.data.Feature;
+import com.ibm.airlock.common.data.PurchaseOption;
 import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import org.json.JSONArray;
+import org.json.JSONException;
 
 import java.util.Collection;
 
 import javax.annotation.CheckForNull;
-import javax.inject.Inject;
 
 public class PurchaseOptionDetailFragment extends FeatureDetailsFragment {
 
     JSONArray storeProductIds;
 
-    @Inject
-    EntitlementsService entitlementsService;
-
-    @Inject
-    FeaturesService featuresService;
-
     protected void setChildrenData(Bundle args, Feature feature) {
         storeProductIds = ((PurchaseOption) feature).getStores();
-    }
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
     }
 
     protected String getProductId(String name) {
@@ -57,7 +43,7 @@ public class PurchaseOptionDetailFragment extends FeatureDetailsFragment {
     }
 
     protected Feature getFeature(String name) {
-        Collection<Entitlement> entitlements = entitlementsService.getEntitlements();
+        Collection<Entitlement> entitlements = AirlockManager.getInstance().getEntitlements();
         for (Entitlement entitlement : entitlements) {
             Feature purchaseOption = purchaseOptionLookUp(entitlement, name);
             if (purchaseOption != null) {
@@ -107,17 +93,22 @@ public class PurchaseOptionDetailFragment extends FeatureDetailsFragment {
                                                 dialog.cancel();
                                                 try {
                                                     if (((Switch) mainView.findViewById(R.id.purchase_value)).isChecked()) {
-                                                        entitlementsService.addPurchasedProductsId(getProductId(mName));
+                                                        AirlockManager.getInstance().addPurchasedProductsId(getProductId(mName));
                                                     } else {
-                                                        entitlementsService.removePurchasedProductId(getProductId(mName));
+                                                        AirlockManager.getInstance().removePurchasedProductId(getProductId(mName));
                                                     }
-
-                                                    featuresService.calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(),
-                                                            featuresService.getPurchasedProductIdsForDebug());
-                                                    featuresService.syncFeatures();
-                                                    Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
-                                                    updateFragment(getFeature(mName));
-                                                    updateGUI();
+                                                    try {
+                                                        AirlockManager.getInstance().calculateFeatures(((DebugFeaturesActivity) getActivity()).getDeviceContext(),
+                                                                AirlockManager.getInstance().getPurchasedProductIdsForDebug());
+                                                        AirlockManager.getInstance().syncFeatures();
+                                                        Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
+                                                        updateFragment(getFeature(mName));
+                                                        updateGUI();
+                                                        //mCallBack.onPercentageChanged();
+                                                    } catch (AirlockNotInitializedException | JSONException e) {
+                                                        Toast.makeText(getActivity().getApplicationContext(), "Failed to calculate : " + e.toString(), Toast.LENGTH_LONG).show();
+                                                        Log.d(this.getClass().getName(), "Airlock calculate & Sync Failed: " + e.getLocalizedMessage());
+                                                    }
                                                 } catch (Exception e) {
                                                     Log.w(Constants.LIB_LOG_TAG, "Error while simulate purchase process: ", e);
                                                 }
@@ -152,7 +143,7 @@ public class PurchaseOptionDetailFragment extends FeatureDetailsFragment {
     }
 
     private boolean isPurchased() {
-        Collection<String> purchasedProductIds = featuresService.getPurchasedProductIdsForDebug();
+        Collection<String> purchasedProductIds = AirlockManager.getInstance().getPurchasedProductIdsForDebug();
         return purchasedProductIds.contains(getProductId(mName));
 
     }
@@ -188,7 +179,7 @@ public class PurchaseOptionDetailFragment extends FeatureDetailsFragment {
     protected void updateGUI() {
         super.updateGUI();
         mainView.findViewById(R.id.children).setVisibility(View.INVISIBLE);
-        mainView.findViewById(R.id.purchase_bar).setVisibility(View.VISIBLE);
+        ((LinearLayout) mainView.findViewById(R.id.purchase_bar)).setVisibility(View.VISIBLE);
         ((TextView) mainView.findViewById(R.id.ids_value)).setText(storeProductIds.toString());
         mainView.findViewById(R.id.is_purchased_bar).setVisibility(View.GONE);
         mainView.findViewById(R.id.is_premium_bar).setVisibility(View.GONE);

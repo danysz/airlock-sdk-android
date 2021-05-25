@@ -1,28 +1,24 @@
 package com.weather.airlock.sdk.ui;
 
 /**
- * @author Denis Voloshin on 04/09/2017.
+ * Created by Denis Voloshin on 04/09/2017.
  */
+
+import java.util.ArrayList;
 
 import android.app.Fragment;
 import android.content.Context;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
-
-import com.ibm.airlock.common.services.StreamsService;
 import com.ibm.airlock.common.streams.AirlockStream;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
-
-import java.util.ArrayList;
-
-import javax.inject.Inject;
 
 
 public class TraceListFragment extends StreamDataFragment {
@@ -33,8 +29,6 @@ public class TraceListFragment extends StreamDataFragment {
     //adapter for rendering
     private CustomAction adapter;
 
-    @Inject
-    StreamsService streamsService;
 
     public static Fragment newInstance(String streamName) {
         Fragment fragment = new TraceListFragment();
@@ -45,12 +39,6 @@ public class TraceListFragment extends StreamDataFragment {
         return fragment;
     }
 
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-    }
 
     @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
@@ -59,7 +47,7 @@ public class TraceListFragment extends StreamDataFragment {
         View view = inflater.inflate(R.layout.trace_list, container, false);
         listView = (ListView) view.findViewById(R.id.list);
 
-        final AirlockStream stream = streamsService.getStreamByName(streamName);
+        final AirlockStream stream = AirlockManager.getInstance().getStreamsManager().getStreamByName(streamName);
         String[] trace = stream.getTraceRecords();
         ArrayList<String> notNullTrace = new ArrayList<>();
         for (String trace_row : trace) {

@@ -1,14 +1,14 @@
 package com.weather.airlock.sdk.ui;
 
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.TextView;
 
-import com.ibm.airlock.common.model.PurchaseOption;
+import com.ibm.airlock.common.data.PurchaseOption;
 import com.weather.airlock.sdk.R;
 
 import org.json.JSONException;

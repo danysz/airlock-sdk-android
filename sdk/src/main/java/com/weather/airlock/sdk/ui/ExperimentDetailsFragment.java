@@ -14,22 +14,19 @@ import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.ibm.airlock.common.percentage.PercentageManager;
-import com.ibm.airlock.common.services.FeaturesService;
-import com.ibm.airlock.common.services.InfraAirlockService;
+import com.ibm.airlock.common.AirlockNotInitializedException;
+import com.ibm.airlock.common.cache.PercentageManager;
 import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import javax.inject.Inject;
-
 
 /**
- * @author amirle on 04/09/2017.
+ * Created by amirle on 04/09/2017.
  */
 public class ExperimentDetailsFragment extends Fragment {
 
@@ -45,16 +42,11 @@ public class ExperimentDetailsFragment extends Fragment {
     private String mIsOn;
     private String mTrace;
     private String mAppVersion;
+    private static final String TAG = ExperimentDetailsFragment.class.getName();
 
-
-    @Inject
-    InfraAirlockService infraAirlockService;
-
-    @Inject
-    FeaturesService featuresService;
 
     public ExperimentDetailsFragment() {
-        this.percentageManager = infraAirlockService.getPercentageManager();
+        this.percentageManager = AirlockManager.getInstance().getCacheManager().getPercentageManager();
 
     }
 
@@ -67,7 +59,7 @@ public class ExperimentDetailsFragment extends Fragment {
             args.putString(TRACE, experiment.getString(Constants.JSON_FEATURE_TRACE));
             args.putString(APP_VERSION, experiment.getString(Constants.JSON_FEATURE_FIELD_VERSION_RANGE));
         } catch (JSONException e) {
-            e.printStackTrace();
+            Log.e(TAG, e.getMessage());
         }
 
         fragment.setArguments(args);
@@ -131,13 +123,17 @@ public class ExperimentDetailsFragment extends Fragment {
                                                 try {
                                                     percentageSwitch.performClick();
                                                     percentageManager.setDeviceInItemPercentageRange(PercentageManager.Sections.EXPERIMENTS, Constants.JSON_FIELD_EXPERIMENTS + "." + mName, percentageSwitch.isChecked());
-
-                                                    featuresService.calculateFeatures(((DebugExperimentsActivity) getActivity()).getDeviceContext(), featuresService.getPurchasedProductIdsForDebug());
-                                                    featuresService.syncFeatures();
-                                                    Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
-                                                    updateFragment(findExperimentByName(mName));
-                                                    updateGUI();
-                                                    mCallBack.onPercentageChanged();
+                                                    try {
+                                                        AirlockManager.getInstance().calculateFeatures(((DebugExperimentsActivity) getActivity()).getDeviceContext(), AirlockManager.getInstance().getPurchasedProductIdsForDebug());
+                                                        AirlockManager.getInstance().syncFeatures();
+                                                        Toast.makeText(getActivity().getApplicationContext(), "Calculate & Sync is done", Toast.LENGTH_SHORT).show();
+                                                        updateFragment(findExperimentByName(mName));
+                                                        updateGUI();
+                                                        mCallBack.onPercentageChanged();
+                                                    } catch (AirlockNotInitializedException | JSONException e) {
+                                                        Toast.makeText(getActivity().getApplicationContext(), "Failed to calculate : " + e.toString(), Toast.LENGTH_LONG).show();
+                                                        Log.d(this.getClass().getName(), "Airlock calculate & Sync Failed: " + e.getLocalizedMessage());
+                                                    }
                                                 } catch (JSONException e) {
                                                     Log.w(Constants.LIB_LOG_TAG, "Error while updating Experiment's random number: ", e);
                                                 }
@@ -173,7 +169,7 @@ public class ExperimentDetailsFragment extends Fragment {
 
     private JSONObject findExperimentByName(String expName) {
         try {
-            JSONObject root = new JSONObject(infraAirlockService.getPersistenceHandler().read(Constants.JSON_FIELD_DEVICE_EXPERIMENTS_LIST, ""));
+            JSONObject root = new JSONObject(AirlockManager.getInstance().getCacheManager().getPersistenceHandler().read(Constants.JSON_FIELD_DEVICE_EXPERIMENTS_LIST, ""));
             JSONArray arr = root.getJSONArray(Constants.JSON_FIELD_EXPERIMENTS);
             for (int i = 0; i < arr.length(); i++) {
                 JSONObject experiment = arr.getJSONObject(i);
@@ -190,9 +186,6 @@ public class ExperimentDetailsFragment extends Fragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-
         if (context instanceof PercentageHolder) {
             mCallBack = (PercentageHolder) context;
         } else {
@@ -237,7 +230,7 @@ public class ExperimentDetailsFragment extends Fragment {
             args.putString(TRACE, experiment.getString(Constants.JSON_FEATURE_TRACE));
             args.putString(APP_VERSION, experiment.getString(Constants.JSON_FEATURE_FIELD_VERSION_RANGE));
         } catch (JSONException e) {
-            e.printStackTrace();
+            Log.e(TAG, e.getMessage());
         }
     }
 }

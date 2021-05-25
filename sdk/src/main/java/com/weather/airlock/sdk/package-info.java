@@ -1,10 +1,10 @@
 /**
- * This package contains classes of Airlock model.
+ * This package contains public methods that developers use to air-lock features
  */
 
 @ParametersAreNonnullByDefault
 @ReturnValuesAreNonnullByDefault
-package com.weather.airlock.sdk.dagger;
+package com.weather.airlock.sdk;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 

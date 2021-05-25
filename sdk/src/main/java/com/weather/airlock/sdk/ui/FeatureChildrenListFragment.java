@@ -3,7 +3,7 @@ package com.weather.airlock.sdk.ui;
 import android.app.Fragment;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.support.annotation.Nullable;
+import androidx.annotation.Nullable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,15 +12,12 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.ibm.airlock.common.services.FeaturesService;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
-
-import javax.inject.Inject;
 
 
 /**
- * @author Denis Voloshin on 30/11/2017.
+ * Created by Denis Voloshin on 30/11/2017.
  */
 
 public class FeatureChildrenListFragment extends Fragment {
@@ -38,8 +35,6 @@ public class FeatureChildrenListFragment extends Fragment {
     // holds an array of children
     private String[] children;
 
-    @Inject
-    FeaturesService featuresService;
 
     public FeatureChildrenListFragment() {
         super();
@@ -55,15 +50,8 @@ public class FeatureChildrenListFragment extends Fragment {
     }
 
     @Override
-    public void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
-    }
-
-    @Override
     public View onCreateView(LayoutInflater inflater, @Nullable ViewGroup container,
-                             @Nullable Bundle savedInstanceState) {
+            @Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         if (getArguments() != null) {
             if (getArguments().getSerializable(CHILDREN_DATA) != null) {
@@ -91,7 +79,7 @@ public class FeatureChildrenListFragment extends Fragment {
                     } else {
                         ((TextView) convertView).setTextColor(Color.BLACK);
                     }
-                    setText((TextView) convertView, child);
+                    setText((TextView)convertView, child);
                 }
                 return convertView;
             }
@@ -103,11 +91,11 @@ public class FeatureChildrenListFragment extends Fragment {
         return view;
     }
 
-    protected void setText(TextView convertView, String title) {
+    protected void setText(TextView convertView, String title){
         convertView.setText(title);
     }
 
-    protected boolean isOn(String child) {
-        return featuresService.getFeature(child).isOn();
+    protected boolean isOn(String child){
+        return AirlockManager.getInstance().getFeature(child).isOn();
     }
 }

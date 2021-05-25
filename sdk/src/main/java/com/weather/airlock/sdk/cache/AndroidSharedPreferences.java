@@ -1,60 +1,53 @@
 package com.weather.airlock.sdk.cache;
 
-import android.content.SharedPreferences;
-
-import java.util.Map;
 import java.util.Set;
-
 import javax.annotation.Nullable;
+
+import android.content.SharedPreferences;
 
 
 /**
- * @author Denis Voloshin
+ * Created by Denis Voloshin on 02/11/2017.
  */
 
 public class AndroidSharedPreferences implements com.ibm.airlock.common.cache.SharedPreferences {
 
-    private SharedPreferences sharedPreferences;
+    private SharedPreferences sp;
 
     public AndroidSharedPreferences(SharedPreferences sp) {
-        this.sharedPreferences = sp;
+        this.sp = sp;
     }
 
     @Override
     public boolean getBoolean(String key, boolean defValue) {
-        return sharedPreferences.getBoolean(key, defValue);
+        return sp.getBoolean(key, defValue);
     }
 
 
     @Override
     public long getLong(String key, long defValue) {
-        return sharedPreferences.getLong(key, defValue);
-    }
-
-    @Override
-    public Map<String, ?> getAll() {
-        return sharedPreferences.getAll();
+        return sp.getLong(key, defValue);
     }
 
     @Nullable
     @Override
     public String getString(String key, @Nullable String defValue) {
-        return sharedPreferences.getString(key, defValue);
+        return sp.getString(key, defValue);
     }
 
     @Override
     public com.ibm.airlock.common.cache.SharedPreferences.Editor edit() {
-        return new AndroidEditor(this.sharedPreferences.edit());
+        return new AndroidEditor(this.sp.edit());
     }
 
     @Override
     public int getInt(String key, int defValue) {
-        return sharedPreferences.getInt(key, defValue);
+        return sp.getInt(key, defValue);
     }
 
     @Override
     public Set<String> getStringSet(String key, Object o) {
-        return sharedPreferences.getStringSet(key, (Set<String>) o);
+        return sp.getStringSet(key, (Set<String>) o);
     }
 
     public class AndroidEditor implements com.ibm.airlock.common.cache.SharedPreferences.Editor {

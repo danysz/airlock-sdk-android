@@ -1,12 +1,21 @@
 package com.weather.airlock.sdk.ui;
 
-import android.content.ClipboardManager;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
 import android.content.Context;
 import android.content.pm.ActivityInfo;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.v7.app.AppCompatActivity;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.AppCompatActivity;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
@@ -19,27 +28,19 @@ import android.widget.EditText;
 import android.widget.Filter;
 import android.widget.ListView;
 import android.widget.Toast;
-
-import com.ibm.airlock.common.AirlockCallback;
-import com.ibm.airlock.common.services.InfraAirlockService;
-import com.ibm.airlock.common.services.UserGroupsService;
-import com.ibm.airlock.common.util.Constants;
-import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
-
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.json.JSONObject;
+import com.ibm.airlock.common.AirlockCallback;
+import com.ibm.airlock.common.AirlockNotInitializedException;
+import com.ibm.airlock.common.net.AirlockDAO;
+import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.AirlockManager;
+import com.weather.airlock.sdk.R;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.Response;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Hashtable;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
-
-import javax.inject.Inject;
 
 /**
  * The class contains UI logic which enables a dev user to specify which
@@ -49,6 +50,7 @@ import javax.inject.Inject;
  * @author Denis Voloshin
  */
 public class GroupsManagerActivity extends AppCompatActivity {
+
 
     private List<String> filteredUserGroups = new ArrayList();
 
@@ -67,11 +69,6 @@ public class GroupsManagerActivity extends AppCompatActivity {
     //current user groups names
     private List<String> userGroupNames;
 
-    @Inject
-    UserGroupsService userGroupsService;
-
-    @Inject
-    InfraAirlockService infraAirlockService;
 
     /**
      * Called when the activity is first created.
@@ -79,8 +76,6 @@ public class GroupsManagerActivity extends AppCompatActivity {
     @Override
     public void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
 
         //set empty list
         setContentView(R.layout.groups_list);
@@ -91,30 +86,46 @@ public class GroupsManagerActivity extends AppCompatActivity {
         //init list
         this.userGroups = new Hashtable<>();
 
+
         // disable landscape mode
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
 
-        userGroupsService.getServerUserGroups(new AirlockCallback() {
+        AirlockDAO.pullUserGroups(AirlockManager.getInstance().getCacheManager(), new Callback() {
             @Override
-            public void onFailure(Exception e) {
-                final String error = String.format(getResources().getString(R.string.retrieving_user_groups), e.getMessage());
+            public void onFailure(Call call, IOException e) {
+                final String error = String.format(getResources().getString(R.string.retrieving_user_groups), call.request().url().toString());
                 Log.e(Constants.LIB_LOG_TAG, error);
                 userGroups = null;
                 showToast(error);
             }
 
             @Override
-            public void onSuccess(String userGroups) {
+            public void onResponse(Call call, Response response) throws IOException {
+                //read the response to the string
+                if (response.body() == null || response.body().toString().equals("") || !response.isSuccessful()) {
+
+                    if (response.body() != null) {
+                        response.body().close();
+                    }
+
+                    final String warning = getResources().getString(R.string.user_groups_is_empty);
+                    Log.w(Constants.LIB_LOG_TAG, warning);
+                    showToast(warning);
+                    return;
+                }
+
                 //parse server response,the response has to be in json format
                 try {
-                    if (userGroups.isEmpty()) {
+                    final JSONObject groupsFullResponse = new JSONObject(response.body().string());
+                    response.body().close();
+                    if (groupsFullResponse.isNull("internalUserGroups")) {
                         String warning = getResources().getString(R.string.user_groups_is_empty);
                         Log.w(Constants.LIB_LOG_TAG, warning);
                         showToast(warning);
                         return;
                     }
+                    final JSONArray internalUserGroups = groupsFullResponse.getJSONArray("internalUserGroups");
 
-                    final JSONArray internalUserGroups = new JSONArray(userGroups);
                     GroupsManagerActivity.this.runOnUiThread(new Runnable() {
                         @Override
                         public void run() {
@@ -188,7 +199,7 @@ public class GroupsManagerActivity extends AppCompatActivity {
 
             @Override
             public void onTextChanged(CharSequence sequence, int start, int before, int count) {
-                if (adapter != null) {
+                if(adapter !=null){
                     adapter.getFilter().filter(sequence);
                 }
             }
@@ -214,7 +225,7 @@ public class GroupsManagerActivity extends AppCompatActivity {
     public void onPause() {
         super.onPause();
         //store new userGroups
-        if (userGroups == null) {
+        if(userGroups == null){
             return;
         }
         List<String> selected = new ArrayList<>();
@@ -223,27 +234,29 @@ public class GroupsManagerActivity extends AppCompatActivity {
                 selected.add(pair.getKey());
             }
         }
-        userGroupsService.setDeviceUserGroups(selected);
-        writeDataToClipBoard(selected);
+        AirlockManager.getInstance().getCacheManager().getPersistenceHandler().storeDeviceUserGroups(selected, AirlockManager.getInstance().getStreamsManager());
         //clear the runtime and try to fetch the develop configuration
-        infraAirlockService.clearRuntimeData();
+        AirlockManager.getInstance().getCacheManager().clearRuntimeData();
+        try {
+            AirlockManager.getInstance().pullFeatures(new AirlockCallback() {
+                @Override
+                public void onFailure(@NonNull Exception e) {
+                    Log.e(Constants.LIB_LOG_TAG, e.toString());
+                }
 
-        infraAirlockService.pullFeatures(new AirlockCallback() {
-            @Override
-            public void onFailure(@NonNull Exception e) {
-                Log.e(Constants.LIB_LOG_TAG, e.toString());
-            }
+                @Override
+                public void onSuccess(@NonNull String msg) {
 
-            @Override
-            public void onSuccess(@NonNull String msg) {
-
-            }
-        });
+                }
+            });
+        } catch (AirlockNotInitializedException error) {
+            Log.e(Constants.LIB_LOG_TAG, error.toString());
+        }
     }
 
     private Map<String, Boolean> generateUserGroupsList(JSONArray serverInternalUserGroups) {
         Map<String, Boolean> userGroups = new Hashtable<>();
-        List<String> selectedUserGroups = userGroupsService.getDeviceUserGroups();
+        List<String> selectedUserGroups = AirlockManager.getInstance().getCacheManager().getPersistenceHandler().getDeviceUserGroups();
         try {
             for (int i = 0; i < serverInternalUserGroups.length(); i++) {
                 String groupName = serverInternalUserGroups.getString(i);
@@ -260,15 +273,6 @@ public class GroupsManagerActivity extends AppCompatActivity {
                     Toast.LENGTH_SHORT).show();
         }
         return userGroups;
-    }
-
-
-    private void writeDataToClipBoard(List<String> selectedUserGroups) {
-        ClipboardManager clipboard = (ClipboardManager) this
-                .getSystemService(GroupsManagerActivity.CLIPBOARD_SERVICE);
-        android.content.ClipData clip = android.content.ClipData.newPlainText(Constants.SP_USER_GROUPS, Constants.USER_GROUP_CLICK_BOARD_PREFIX +
-                selectedUserGroups.toString());
-        clipboard.setPrimaryClip(clip);
     }
 
     private void findViewsById() {

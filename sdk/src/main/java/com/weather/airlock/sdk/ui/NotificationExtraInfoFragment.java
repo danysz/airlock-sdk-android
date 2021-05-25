@@ -2,7 +2,6 @@ package com.weather.airlock.sdk.ui;
 
 
 import android.app.Fragment;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
@@ -12,21 +11,15 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 
 import com.ibm.airlock.common.notifications.AirlockNotification;
-import com.ibm.airlock.common.services.NotificationService;
+import com.weather.airlock.sdk.AirlockManager;
 import com.weather.airlock.sdk.R;
-import com.weather.airlock.sdk.dagger.AirlockClientsManager;
 
 import javax.annotation.Nullable;
-import javax.inject.Inject;
 
 
 public class NotificationExtraInfoFragment extends NotificationDataFragment {
     final public static String NOTIFICATION_DATA_TYPE = "notification.data type";
     private DataType type;
-
-
-    @Inject
-    NotificationService notificationService;
 
     public enum DataType {
         CONFIGURATION("Configuration"),
@@ -40,7 +33,7 @@ public class NotificationExtraInfoFragment extends NotificationDataFragment {
             this.tag = tag;
         }
 
-        public String getTag() {
+        public String getTag(){
             return this.tag;
         }
 
@@ -54,24 +47,15 @@ public class NotificationExtraInfoFragment extends NotificationDataFragment {
         }
     }
 
-
-    public static Fragment newInstance(String notificationName, DataType type) {
+    public static Fragment newInstance(String notificationName,DataType type) {
         Fragment fragment = new NotificationExtraInfoFragment();
         // arguments
         Bundle arguments = new Bundle();
         arguments.putString(NOTIFICATION_NAME, notificationName);
-        arguments.putString(NOTIFICATION_DATA_TYPE, type.getTag());
+        arguments.putString(NOTIFICATION_DATA_TYPE,type.getTag());
         fragment.setArguments(arguments);
 
         return fragment;
-    }
-
-
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        // init Dagger
-        AirlockClientsManager.getAirlockClientDiComponent().inject(this);
     }
 
     @Override
@@ -88,23 +72,23 @@ public class NotificationExtraInfoFragment extends NotificationDataFragment {
         // Inflate the layout for this fragment
         View view = inflater.inflate(R.layout.stream_data, container, false);
 
-        final AirlockNotification notification = notificationService.getNotification(notificationName);
+        final AirlockNotification notification = AirlockManager.getInstance().getCacheManager().getNotificationsManager().getNotification(notificationName);
         if (notification != null) {
-            final TextView headerTextView = view.findViewById(R.id.header);
-            headerTextView.setText("Notification's " + type.getTag() + " data:");
+            final TextView headerTextView = (TextView) view.findViewById(R.id.header);
+            headerTextView.setText("Notification's "+type.getTag()+" data:");
 
-            final TextView textView = view.findViewById(R.id.stream_data);
+            final TextView textView = (TextView) view.findViewById(R.id.stream_data);
             textView.setMovementMethod(new ScrollingMovementMethod());
 
             textView.setText(getFragmentText(notification));
 
-            textView.setOnLongClickListener(new View.OnLongClickListener() {
+            textView.setOnLongClickListener(new  View.OnLongClickListener() {
                 @Override
-                public boolean onLongClick(View arg1) {
+                public boolean onLongClick( View arg1) {
                     Intent intent = new Intent(Intent.ACTION_SEND);
                     intent.setType("plain/json");
                     intent.putExtra(Intent.EXTRA_EMAIL, new String[]{});
-                    intent.putExtra(Intent.EXTRA_SUBJECT, "Notification [" + notification.getName() + "] configuration");
+                    intent.putExtra(Intent.EXTRA_SUBJECT, "Notification ["+notification.getName()+"] configuration");
                     intent.putExtra(Intent.EXTRA_TEXT, textView.getText().toString());
                     startActivity(Intent.createChooser(intent, ""));
                     return true;
@@ -115,20 +99,20 @@ public class NotificationExtraInfoFragment extends NotificationDataFragment {
         return view;
     }
 
-    private String getFragmentText(AirlockNotification notification) {
-        String text = "";
-        switch (type) {
+    private String getFragmentText(AirlockNotification notification){
+        String text="";
+        switch (type){
             case CONFIGURATION:
                 text = NotificationDataFragment.formatString(notification.getConfiguration() == null
                         || notification.getConfiguration().isEmpty() ? "{}" : notification.getConfiguration());
                 break;
             case PREVIOUSLY_FIRED:
                 text = (notification.getFiredHistory() == null
-                        || notification.getFiredHistory().length() <= 0) ? "The specified notification was not fired yet!" : formatString(notification.getFiredHistory().toString());
+                        || notification.getFiredHistory().length()<=0) ? "The specified notification was not fired yet!" : formatString(notification.getFiredHistory().toString());
                 break;
             case HISTORY:
                 text = (notification.getRegistrationHistory() == null
-                        || notification.getRegistrationHistory().length() <= 0) ? "The specified notification has no history records!" : formatString(notification.getRegistrationHistory().toString());
+                        || notification.getRegistrationHistory().length()<=0) ? "The specified notification has no history records!" : formatString(notification.getRegistrationHistory().toString());
                 break;
             case TRACE:
                 text = NotificationDataFragment.formatString(notification.getTraceInfo() == null

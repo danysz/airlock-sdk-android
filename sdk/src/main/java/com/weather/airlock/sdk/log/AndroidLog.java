@@ -5,7 +5,7 @@ import android.util.Log;
 
 
 /**
- * @author Denis Voloshin
+ * Created by Denis Voloshin on 03/11/2017.
  */
 
 public class AndroidLog implements com.ibm.airlock.common.log.Log {

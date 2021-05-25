@@ -2,7 +2,7 @@ package com.weather.airlock.sdk.commons.utils;
 
 import android.content.Context;
 import android.content.res.AssetManager;
-import android.support.test.InstrumentationRegistry;
+import androidx.test.platform.app.InstrumentationRegistry;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -10,7 +10,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 
 /**
- * @author iditb on 20/11/17.
+ * Created by iditb on 20/11/17.
  */
 
 public class AndroidTestUtils {
