@@ -1,0 +1,3 @@
+[submodule "airlock-sdk-common"]
+	path = airlock-sdk-common
+	url = ../airlock-sdk-common.git
