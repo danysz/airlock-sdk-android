@@ -1,4 +1,6 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android-extensions'
+apply plugin: 'kotlin-android'
 
 
 allprojects {
@@ -8,24 +10,36 @@ allprojects {
         flatDir {
             dirs '../sdk/build/outputs/aar/'
         }
+        maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
     }
 }
 
+buildscript {
+    repositories {
+        jcenter()
+        google()
+        mavenCentral()
+        maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
+    }
+
+    dependencies {
+        classpath 'com.android.tools.build:gradle:3.4.2'
+    }
+
+}
+
 android {
-    compileSdkVersion 27
-    buildToolsVersion '27.0.1'
+    compileSdkVersion 29
+    buildToolsVersion '28.0.3'
 
     defaultConfig {
         applicationId "com.weather.airlockSampleApp"
-        minSdkVersion 26
-        targetSdkVersion 27
+        minSdkVersion 21
+        targetSdkVersion 29
         versionCode 1
         versionName "1.0"
-        javaCompileOptions{
-            annotationProcessorOptions{
-                includeCompileClasspath = true
-            }
-        }
+        multiDexEnabled true
+
     }
 
     signingConfigs {
@@ -43,6 +57,8 @@ android {
         }
         debug {
             testCoverageEnabled true
+            minifyEnabled false
+            useProguard false
         }
     }
 
@@ -52,14 +68,20 @@ android {
 }
 
 dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
     testImplementation 'junit:junit:4.12'
-    implementation 'org.mozilla:rhino:1.7.7.1'
-    implementation 'com.android.support:support-v4:27.1.1'
-    implementation 'com.android.support:appcompat-v7:27.1.1'
+    implementation 'androidx.appcompat:appcompat:1.0.0'
     implementation 'com.squareup.okhttp3:okhttp:3.4.1'
     implementation 'com.squareup.okhttp3:okhttp-urlconnection:3.4.1'
-    implementation project(path: ':sdk')
-    //compile ( name:'sdk-release', ext:'aar')
+    implementation ( 'com.weather.android:airlock-sdk-android:5.4.1-SNAPSHOT@aar')
+    //implementation ( name:'sdk-5.3.35', ext:'aar')
     testImplementation 'org.robolectric:robolectric:3.1.2'
     testImplementation 'org.khronos:opengl-api:gl1.1-android-2.1_r1'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
+    implementation "androidx.lifecycle:lifecycle-runtime:2.0.0"
+    implementation "androidx.lifecycle:lifecycle-extensions:2.0.0"
+    //implementation project(path: ':airlock-sdk-common')
+}
+repositories {
+    mavenCentral()
 }

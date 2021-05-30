@@ -39,4 +39,8 @@
     <item
         android:id="@+id/streams"
         android:title="@string/menu_item_streams" />
+
+    <item
+        android:id="@+id/airlytics"
+        android:title="airlytics" />
 </menu>

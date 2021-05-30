@@ -1,1 +1,1 @@
-include ':sdkSample', ':sdk'
+include ':sdkSample', ':sdk' , ":airlock-sdk-common"

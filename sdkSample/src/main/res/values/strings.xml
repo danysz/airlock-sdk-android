@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Demo Airlock App</string>
+    <string name="app_name">airlock-sdk-android</string>
     <string name="groups">groups</string>
     <string name="features_title">Features</string>
 
