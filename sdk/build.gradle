@@ -8,16 +8,20 @@ apply plugin: 'signing'
 ext {
     SNAPSHOT = true
     BUILD_NUMBER = System.getenv("BUILD_NUMBER") ?: devBuildNumber
-    VERSION_MICRO_BUILD_NUMBER = releaseMicroBuildNumber
+    VERSION_MICRO_BUILD_NUMBER = project.hasProperty("releaseMicroBuildNumber") ? releaseMicroBuildNumber : 0
 
     REPO_URL = SNAPSHOT ? "https://oss.sonatype.org/content/repositories/snapshots" :
             "https://oss.sonatype.org/service/local/staging/deploy/maven2/"
-    VERSION_MAJOR_SDK = releaseMajorBuildNumber
-    VERSION_MINOR_SDK = releaseMinorBuildNumber
-    VERSION_MICRO_SDK = releaseMicroBuildNumber
+    VERSION_MAJOR_SDK = project.hasProperty("releaseMajorBuildNumber") ? releaseMajorBuildNumber : 0
+    VERSION_MINOR_SDK = project.hasProperty("releaseMinorBuildNumber") ? releaseMinorBuildNumber : 0
+    VERSION_MICRO_SDK = project.hasProperty("releaseMicroBuildNumber") ? releaseMicroBuildNumber : 0
     VERSION_EXTENSION_SDK = SNAPSHOT ? "-SNAPSHOT" : ""
     VERSION_MICRO_SDK = SNAPSHOT ? "$BUILD_NUMBER" : VERSION_MICRO_BUILD_NUMBER
     VERSION_SDK = "$VERSION_MAJOR_SDK.$VERSION_MINOR_SDK.$VERSION_MICRO_SDK$VERSION_EXTENSION_SDK"
+
+    SONATYPE_PASSWORD = project.hasProperty("sonatypePassword") ? sonatypePassword : ""
+    SONATYPE_USER = project.hasProperty("sonatypeUsername") ? sonatypeUsername : ""
+
 }
 
 
@@ -199,7 +203,6 @@ gradle.taskGraph.whenReady {
 }
 
 
-
 //ignore all test failures - is done temporary, the final solution is test categorization
 project.gradle.taskGraph.whenReady {
     ->
@@ -212,8 +215,9 @@ project.gradle.taskGraph.whenReady {
     }
 }
 
-
-
+signArchives.enabled = false
+uploadArchives.enabled = false
+uploadArchives.finalizedBy(signing)
 
 uploadArchives {
     repositories {
@@ -221,11 +225,11 @@ uploadArchives {
             beforeDeployment { MavenDeployment deployment -> signing.signPom(deployment) }
 
             repository(url: "https://oss.sonatype.org/service/local/staging/deploy/maven2/") {
-                authentication(userName: sonatypeUsername, password: sonatypePassword)
+                authentication(userName: SONATYPE_USER, password: SONATYPE_PASSWORD)
             }
 
             snapshotRepository(url: "https://oss.sonatype.org/content/repositories/snapshots/") {
-                authentication(userName: sonatypeUsername, password: sonatypePassword)
+                authentication(userName: SONATYPE_USER, password: SONATYPE_PASSWORD)
             }
             pom.project {
                 name "Airlock SDK for Android"
