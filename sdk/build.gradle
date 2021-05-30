@@ -6,7 +6,7 @@ apply plugin: 'maven'
 apply plugin: 'signing'
 
 ext {
-    SNAPSHOT = false
+    SNAPSHOT = true
     BUILD_NUMBER = System.getenv("BUILD_NUMBER") ?: devBuildNumber
     VERSION_MICRO_BUILD_NUMBER = releaseMicroBuildNumber
 

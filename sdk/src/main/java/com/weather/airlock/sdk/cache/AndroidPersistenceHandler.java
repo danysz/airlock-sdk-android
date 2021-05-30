@@ -39,7 +39,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
         context = c;
         //If first time the app starts or it is a test mock app (files dir is null) - do not read from file system
         if (isInitialized() && context.getFilesDir() != null) {
-            new Thread(new AndroidPersistenceHandler.FilePreferencesReader(callback)).start();
+            new Thread(new FilePreferencesReader(callback)).start();
         }
     }
 
@@ -51,7 +51,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
         context = c;
         //If first time the app starts or it is a test mock app (files dir is null) - do not read from file system
         if (isInitialized() && context.getFilesDir() != null) {
-            new Thread(new AndroidPersistenceHandler.FilePreferencesReader(null)).start();
+            new Thread(new FilePreferencesReader(null)).start();
         }
     }
 
@@ -67,13 +67,13 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
                 inMemoryPreferences.put(key, value);
                 //if it is a test mock app (files dir is null) - do not write to file system
                 if (this.context.getFilesDir() != null) {
-                    new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value.toString())).start();
+                    new Thread(new FilePreferencesPersister(key, value.toString())).start();
                 }
             } else {
                 //remove data
                 inMemoryPreferences.remove(key);
                 context.deleteFile(key);
-                new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value.toString())).start();
+                new Thread(new FilePreferencesPersister(key, value.toString())).start();
             }
         }
     }
@@ -94,14 +94,14 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
                     }
                     //if it is a test mock app (files dir is null) - do not write to file system
                     if (this.context.getFilesDir() != null) {
-                        new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value)).start();
+                        new Thread(new FilePreferencesPersister(key, value)).start();
                     }
                 } else {
                     //remove data
                     inMemoryPreferences.remove(key);
                     context.deleteFile(key);
                     if (filePersistPreferences.contains(key)) {
-                        new Thread(new AndroidPersistenceHandler.FilePreferencesPersister(key, value)).start();
+                        new Thread(new FilePreferencesPersister(key, value)).start();
                     }
                 }
             }
@@ -136,7 +136,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
                     fos.write(jsonAsString.getBytes());
                     fos.close();
                     Logger.log.d(TAG, "Write to file system of : " + name + " took : " + (System.currentTimeMillis() - startTime));
-                } catch (java.io.IOException e) {
+                } catch (IOException e) {
                     Logger.log.w(TAG, "Failed to persist content of: " + name + " to file system.");
                 }
             }
@@ -243,7 +243,7 @@ public class AndroidPersistenceHandler extends BasePersistenceHandler {
                 fos.write(value == null ? "".getBytes() : value.getBytes());
                 fos.close();
                 Logger.log.d(TAG, "Write to file system of : " + key + " took : " + (System.currentTimeMillis() - startTime));
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 Logger.log.w(TAG, "Failed to persist content of: " + key + " to file system.");
             }
         }

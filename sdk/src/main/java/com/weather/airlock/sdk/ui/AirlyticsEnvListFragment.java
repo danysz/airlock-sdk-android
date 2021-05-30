@@ -19,13 +19,12 @@ import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
+import com.ibm.airlock.common.airlytics.AnalyticsApiInterface;
 import com.ibm.airlock.common.cache.PersistenceHandler;
 import com.ibm.airlock.common.data.Feature;
 import com.weather.airlock.sdk.AirlockManager;
-import com.weather.airlock.sdk.AirlyticsConstants;
 import com.weather.airlock.sdk.R;
-import com.weather.airlytics.AL;
-import com.weather.airlytics.environments.ALEnvironment;
+import com.weather.airlock.sdk.analytics.AnalyticsDefaultImpl;
 
 import org.json.JSONObject;
 
@@ -37,7 +36,6 @@ import java.util.Map;
 import javax.annotation.CheckForNull;
 
 import static com.ibm.airlock.common.util.Constants.SP_AIRLYTICS_EVENT_DEBUG;
-import static com.weather.airlock.sdk.AirlyticsConstants.DEBUG_BANNERS_PROVIDER_NAME;
 
 /**
  * Created by Eitan Schreiber on 21/01/2020.
@@ -50,6 +48,8 @@ public class AirlyticsEnvListFragment extends Fragment {
 
     //adapter for rendering
     private ArrayAdapter<String> adapter;
+
+    private AnalyticsDefaultImpl airlyticsImpl = new AnalyticsDefaultImpl();
 
     //current branches list with  the selection choice for this device.
     private Map<String, String> environments;
@@ -91,8 +91,7 @@ public class AirlyticsEnvListFragment extends Fragment {
                             ((TextView) convertView).setTextSize(15);
                         }
                         String envName = getItem(position);
-                        ALEnvironment env = AirlockManager.getInstance().getAirlyticsEnvironment(envName);
-                        if (env != null) {
+                        if (airlyticsImpl.doesAnalyticsEnvironmentExists(envName)) {
                             ((TextView) convertView).setTextColor(Color.BLUE);
                         } else {
                             ((TextView) convertView).setTextColor(Color.BLACK);
@@ -115,7 +114,7 @@ public class AirlyticsEnvListFragment extends Fragment {
                 toastDebugSwitch.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                     public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
                         sp.write(SP_AIRLYTICS_EVENT_DEBUG, isChecked);
-                        AL.Companion.setDebugEnable(isChecked, DEBUG_BANNERS_PROVIDER_NAME);
+                        airlyticsImpl.setDebugEnable(isChecked);
                     }
                 });
 
@@ -126,8 +125,7 @@ public class AirlyticsEnvListFragment extends Fragment {
                     @Override
                     public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                         if (position > 0) {
-                            final ALEnvironment env = AirlockManager.getInstance().getAirlyticsEnvironment(environmentNames[position - 1]);
-                            if (env == null) {
+                            if (!airlyticsImpl.doesAnalyticsEnvironmentExists(environmentNames[position - 1])) {
                                 showToast(getResources().getString(R.string.environment_not_available, environmentNames[position - 1]));
                                 return;
                             }
@@ -161,30 +159,19 @@ public class AirlyticsEnvListFragment extends Fragment {
 
     @CheckForNull
     private Map<String, String> generateEnvironmentsList() {
-
         AirlockManager manager = AirlockManager.getInstance();
-
-        Feature airlyticsFeature =
-                manager.getFeature(AirlyticsConstants.AIRLYTICS);
+        Feature airlyticsFeature = manager.getFeature(airlyticsImpl.getAnalyticsFeatureName(AnalyticsApiInterface.ConstantsKeys.ANALYTICS_MAIN_FEATURE));
         if (!airlyticsFeature.isOn()) {
             return null;
         }
 
         //read and set environments
         Feature environmentFeature =
-                manager.getFeature(AirlyticsConstants.ENVIRONMENTS);
+                manager.getFeature(airlyticsImpl.getAnalyticsFeatureName(AnalyticsApiInterface.ConstantsKeys.ENVIRONMENTS_FEATURE));
         List<Feature> environments = environmentFeature.getChildren();
         if (environments.isEmpty()) {
             return null;
         }
-
-//        String userId = "";
-//        try {
-//            userId = manager.getAirlockUserUniqueId();
-//        } catch (AirlockNotInitializedException e) {
-//            userId = "NA";
-//            //do nothing - this is called after airlock is initialized already....
-//        }
 
         Map<String, String> environmentsMap = new Hashtable<>();
         for (Feature environmentFeatureItem : environments) {

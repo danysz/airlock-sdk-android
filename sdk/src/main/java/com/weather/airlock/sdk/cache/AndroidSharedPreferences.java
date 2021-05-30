@@ -36,7 +36,7 @@ public class AndroidSharedPreferences implements com.ibm.airlock.common.cache.Sh
     }
 
     @Override
-    public com.ibm.airlock.common.cache.SharedPreferences.Editor edit() {
+    public Editor edit() {
         return new AndroidEditor(this.sp.edit());
     }
 
@@ -50,7 +50,7 @@ public class AndroidSharedPreferences implements com.ibm.airlock.common.cache.Sh
         return sp.getStringSet(key, (Set<String>) o);
     }
 
-    public class AndroidEditor implements com.ibm.airlock.common.cache.SharedPreferences.Editor {
+    public class AndroidEditor implements Editor {
         private SharedPreferences.Editor editor;
 
         public AndroidEditor(SharedPreferences.Editor editor) {

@@ -177,6 +177,28 @@ try {
     e.printStackTrace();
 }
 ````
+## Build
+Do the following steps to build the project locally:
+The lasted code is tested using Android Studio 4.2.1 version
+The project consists if three submodules
+
+- airlock-sdk-common
+- sdk
+- sdkSample
+
+1. Clone the project (note, the project is has submodule dependency)
+
+```
+   git clone https://github.com/IBM/airlock-sdk-android.git
+   cd airlock-sdk-android
+   git submodule init
+   git submodule update 
+```
+
+2. To build the SDK ARR use
+```
+   ./gradlew sdk:build
+```
 
 
 ## API documentation

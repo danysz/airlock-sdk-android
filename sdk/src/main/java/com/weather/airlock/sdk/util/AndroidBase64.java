@@ -11,6 +11,6 @@ import com.ibm.airlock.common.util.Base64Decoder;
 public class AndroidBase64 implements Base64Decoder {
     @Override
     public byte[] decode(String str) {
-        return android.util.Base64.decode(str, Base64.DEFAULT);
+        return Base64.decode(str, Base64.DEFAULT);
     }
 }

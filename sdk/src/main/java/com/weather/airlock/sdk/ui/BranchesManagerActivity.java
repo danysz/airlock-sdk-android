@@ -21,12 +21,15 @@ import android.widget.Toast;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import com.ibm.airlock.common.airlytics.AnalyticsApiInterface;
 import com.ibm.airlock.common.cache.PersistenceHandler;
 import com.ibm.airlock.common.net.AirlockDAO;
 import com.ibm.airlock.common.util.Constants;
 import com.weather.airlock.sdk.AirlockManager;
-import com.weather.airlock.sdk.AirlyticsConstants;
 import com.weather.airlock.sdk.R;
+import com.weather.airlock.sdk.analytics.AnalyticsDefaultImpl;
+
 import okhttp3.Call;
 import okhttp3.Callback;
 import okhttp3.Response;
@@ -61,6 +64,8 @@ public class BranchesManagerActivity extends AppCompatActivity {
     // holds the Id of the selected branch
     @Nullable
     private String selectedDevelopBranchId;
+
+    private AnalyticsDefaultImpl analyticsImpl = AirlockManager.getInstance().getAnalyticsImpl();
 
 
     /**
@@ -147,8 +152,8 @@ public class BranchesManagerActivity extends AppCompatActivity {
                                     if (checkedView.isChecked()) {
                                         selectedDevelopBranch = BranchesManagerActivity.this.branchNames[position - 1];
                                         Map<String, Object> userAttributes = new HashMap<>();
-                                        userAttributes.put(AirlyticsConstants.DEV_USER_ATTRIBUTE, true);
-                                        AirlockManager.getInstance().setAirlyticsUserAttributes(userAttributes, AirlockManager.airlyticsUserAttributesSchemaVersion);
+                                        userAttributes.put(analyticsImpl.getAnalyticsFeatureName(AnalyticsApiInterface.ConstantsKeys.DEV_USER_ATTRIBUTE), true);
+                                        analyticsImpl.setUserAttributes(userAttributes, analyticsImpl.getUserAttributesSchemaVersion());
                                     }
                                 }
                             });
@@ -258,8 +263,8 @@ public class BranchesManagerActivity extends AppCompatActivity {
         }
         selectedDevelopBranch = "";
         Map<String, Object> userAttributes = new HashMap<>();
-        userAttributes.put(AirlyticsConstants.DEV_USER_ATTRIBUTE, false);
-        AirlockManager.getInstance().setAirlyticsUserAttributes(userAttributes, AirlockManager.airlyticsUserAttributesSchemaVersion);
+        userAttributes.put(analyticsImpl.getAnalyticsFeatureName(AnalyticsApiInterface.ConstantsKeys.DEV_USER_ATTRIBUTE), false);
+        analyticsImpl.setUserAttributes(userAttributes, analyticsImpl.getUserAttributesSchemaVersion());
     }
 
     private void findViewsById() {

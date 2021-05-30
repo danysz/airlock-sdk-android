@@ -6,6 +6,7 @@ import android.content.Context;
 import com.ibm.airlock.common.AirlockInvalidFileException;
 import com.ibm.airlock.common.AirlockNotInitializedException;
 import com.ibm.airlock.common.BaseAirlockProductManager;
+import com.ibm.airlock.common.airlytics.AnalyticsApiInterface;
 import com.ibm.airlock.common.cache.InMemoryCache;
 import com.ibm.airlock.common.cache.PersistenceHandler;
 import com.ibm.airlock.common.cache.RuntimeLoader;
@@ -17,49 +18,29 @@ import com.ibm.airlock.common.streams.AirlockStreamResultsTracker;
 import com.ibm.airlock.common.streams.StreamsManager;
 import com.ibm.airlock.common.util.AirlockMessages;
 import com.ibm.airlock.common.util.Base64;
-import com.ibm.airlock.common.util.Constants;
+import com.weather.airlock.sdk.analytics.AnalyticsDefaultImpl;
 import com.weather.airlock.sdk.cache.AndroidContext;
 import com.weather.airlock.sdk.cache.AndroidPersistenceHandler;
 import com.weather.airlock.sdk.log.AndroidLog;
 import com.weather.airlock.sdk.net.AndroidOkHttpClientBuilder;
 import com.weather.airlock.sdk.notifications.AndroidNotificationsManager;
-import com.weather.airlock.sdk.util.AesGcmEncryptionUtil;
 import com.weather.airlock.sdk.util.AndroidBase64;
 import com.weather.airlock.sdk.util.FileUtil;
-import com.weather.airlytics.AL;
-import com.weather.airlytics.environments.ALEnvironment;
-import com.weather.airlytics.environments.ALEnvironmentConfig;
-import com.weather.airlytics.events.ALEvent;
-import com.weather.airlytics.events.ALEventConfig;
-import com.weather.airlytics.providers.data.ALProviderConfig;
-import com.weather.airlytics.userattributes.ALUserAttribute;
-
 import org.jetbrains.annotations.TestOnly;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import javax.annotation.CheckForNull;
 import javax.annotation.Nullable;
-
-import static com.ibm.airlock.common.util.Constants.SP_AIRLYTICS_EVENT_DEBUG;
-import static com.weather.airlock.sdk.AirlyticsConstants.DEBUG_BANNERS_PROVIDER_NAME;
 
 
 /**
@@ -72,8 +53,6 @@ public class AirlockManager extends BaseAirlockProductManager {
 
     private static final String ANDROID_PRODUCT_NAME = "ANDROID_PRODUCT_NAME";
     private static final String TAG = "AirlockManager";
-    public static final String AIRLYTICS_STREAM_RESULT_EVENT_NAME = "stream-results";
-    public static final String AIRLYTICS_STREAM_RESULT_SCHEMA_VERSION = "2.0";
     private static final String DEV_TAG = "DEV";
     private static final String PROD_TAG = "PROD";
 
@@ -82,27 +61,14 @@ public class AirlockManager extends BaseAirlockProductManager {
     private Context applicationContext = null;
 
     //airlytics variables
-    private static final int DEFAULT_LOCATION_PRECISION = 2;
-    private static final int DEFAULT_LOCATION_INTERVAL = 10;
-    private final Map<String, ALEnvironment> airlyticsEnvironmentsMap = new ConcurrentHashMap<>();
-    private static final Map<String, Map<String, Object>> airlyticsPendingEvents = new ConcurrentHashMap<>();
-    private static final AtomicBoolean airlyticsEnabled;
-    private static final AtomicBoolean airlyticsInitialized;
-    private static final AtomicBoolean isDevUser;
-    private static final AtomicBoolean disableAirlyticsLifecycle;
-    public static String airlyticsUserAttributesSchemaVersion = "17.0";
-
-    private static Set<String> userTags;
+    private AnalyticsDefaultImpl airlyticsImpl = new AnalyticsDefaultImpl();
+    public static final AtomicBoolean isDevUser;
 
     static {
         Base64.init(new AndroidBase64());
         Logger.setLogger(new AndroidLog());
         InMemoryCache.setIsEnabled(false);
-        airlyticsInitialized = new AtomicBoolean(false);
-        airlyticsEnabled = new AtomicBoolean(false);
         isDevUser = new AtomicBoolean(false);
-        disableAirlyticsLifecycle = new AtomicBoolean(true);
-        userTags = Collections.synchronizedSet(new HashSet<String>());
     }
 
     private AirlockManager() {
@@ -135,194 +101,8 @@ public class AirlockManager extends BaseAirlockProductManager {
             throw new AirlockNotInitializedException(AirlockMessages.ERROR_SDK_NOT_INITIALIZED);
         } else {
             cacheManager.syncFeatures();
-            updateAirlytics();
+            airlyticsImpl.syncAnalytics();
         }
-    }
-
-    private void updateAirlytics() {
-        if (disableAirlyticsLifecycle.get()) {
-            return;
-        }
-        Feature airlyticsFeature =
-                getFeature(AirlyticsConstants.AIRLYTICS);
-        if (!airlyticsFeature.isOn()) {
-            airlyticsEnabled.set(false);
-            return;
-        }
-        airlyticsEnabled.set(true);
-
-        //read and set providers
-        Feature providersFeature =
-                getFeature(AirlyticsConstants.PROVIDERS);
-        List<Feature> providers = providersFeature.getChildren();
-        List<ALProviderConfig> providerConfigs = new ArrayList<>();
-        for (Feature providerFeature : providers) {
-            JSONObject config = providerFeature.getConfiguration();
-            if (config != null) {
-                ALProviderConfig providerConfig = new ALProviderConfig(config);
-                if (providerConfig.getType().equals(DEBUG_BANNERS_PROVIDER_NAME)) {
-                    PersistenceHandler persistenceHandler = getCacheManager().getPersistenceHandler();
-                    boolean debugEnabled = persistenceHandler.readBoolean(SP_AIRLYTICS_EVENT_DEBUG, providerConfig.getAcceptAllEvents());
-                    AL.Companion.setDebugEnable(debugEnabled, DEBUG_BANNERS_PROVIDER_NAME);
-                    persistenceHandler.write(SP_AIRLYTICS_EVENT_DEBUG, persistenceHandler.readBoolean(SP_AIRLYTICS_EVENT_DEBUG, providerConfig.getAcceptAllEvents()));
-                }
-                providerConfigs.add(providerConfig);
-            }
-        }
-
-        //read and set events
-        Feature eventsFeature =
-                getFeature(AirlyticsConstants.EVENTS);
-        List<Feature> events = eventsFeature.getChildren();
-        ArrayList<ALEventConfig> eventConfigs = new ArrayList<>();
-        for (Feature eventFeature : events) {
-            JSONObject config = eventFeature.getConfiguration();
-            if (config != null) {
-                eventConfigs.add(new ALEventConfig(config));
-            }
-        }
-
-        //read and set events
-        Feature userAttributesFeature =
-                getFeature(AirlyticsConstants.USER_ATTRIBUTES_FEATURE);
-        ArrayList<ALUserAttribute> userAttributeConfigs = null;
-        if (userAttributesFeature.isOn()){
-            List<Feature> userAttributes = userAttributesFeature.getChildren();
-            userAttributeConfigs = new ArrayList<>();
-            for (Feature userAttribute : userAttributes) {
-                JSONObject config = userAttribute.getConfiguration();
-                if (config != null) {
-                    userAttributeConfigs.add(new ALUserAttribute(config));
-                }
-            }
-        }
-
-
-        //read and set environments
-        Feature environmentFeature =
-                getFeature(AirlyticsConstants.ENVIRONMENTS);
-        List<Feature> environments = environmentFeature.getChildren();
-        if (environments.isEmpty()) {
-            airlyticsEnabled.set(false);
-        }
-
-        String userId;
-        try {
-            userId = getAirlockUserUniqueId();
-        } catch (AirlockNotInitializedException e) {
-            userId = UUID.randomUUID().toString();
-            //do nothing - this is called after airlock is initialized already....
-        }
-
-        boolean airlyticsJustInitialized = false;
-
-        userTags = getUserTags(null);
-
-        Feature attributeGroupsFeature =
-                getFeature(AirlyticsConstants.ATTRIBUTE_GROUPS);
-        JSONObject attributeGroupsConfig = attributeGroupsFeature.getConfiguration();
-        JSONArray groupsArray = null;
-        if (attributeGroupsConfig != null) {
-            groupsArray = attributeGroupsConfig.optJSONArray("userAttributesGrouping");
-        }
-
-        for (Feature environmentFeatureItem : environments) {
-            JSONObject config = environmentFeatureItem.getConfiguration();
-            if (config == null) {
-                continue;
-            }
-
-            ALEnvironmentConfig environmentConfig = new ALEnvironmentConfig(config);
-            String environmentName = environmentConfig.getName();
-            ALEnvironment environment = null;
-
-            synchronized (airlyticsInitialized) {
-                environment = airlyticsEnvironmentsMap.get(environmentName);
-                //If this environment requires some user TAG and it does not exist - ignore
-                if (Collections.disjoint(environmentConfig.getTags(), userTags)) {
-                    //if environment was active and now stopped
-                    if (environment != null) {
-                        environment.disableEnvironment();
-                    }
-                    continue;
-                }
-                if (environment == null) {
-                    environmentConfig.setDebugUser(isDevUser.get());
-                    if (!airlyticsInitialized.get()) {
-                        airlyticsJustInitialized = true;
-                        Map<String, String> providersMap = new HashMap<>();
-                        providersMap.put(AirlyticsConstants.REST_EVENT_PROXY_NAME, AirlyticsConstants.REST_EVENT_PROXY_HANDLER);
-                        providersMap.put(AirlyticsConstants.EVENT_LOG_PROVIDER_NAME, AirlyticsConstants.EVENT_LOG_PROVIDER_HANDLER);
-                        providersMap.put(DEBUG_BANNERS_PROVIDER_NAME, AirlyticsConstants.DEBUG_BANNERS_PROVIDER_HANDLER);
-                        providersMap.put(AirlyticsConstants.STREAMS_EVENT_PROXY_NAME, AirlyticsConstants.STREAMS_EVENT_PROXY_HANDLER);
-                        AL.Companion.registerProviderHandlers(providersMap);
-                        if (groupsArray != null) {
-                            AL.Companion.setUserAttributeGroups(groupsArray);
-                        }
-                        airlyticsInitialized.set(true);
-                    }
-                    environment = AL.Companion.createEnvironment(environmentConfig, providerConfigs, eventConfigs, userAttributeConfigs, userId, UUID.fromString(getProductId()), this.cacheManager.getProductVersion(), applicationContext);
-                    airlyticsEnvironmentsMap.put(environmentName, environment);
-                } else {
-                    boolean enableClientSideValidation = config.optBoolean(AirlyticsConstants.JSON_ENABLE_CLIENTSIDE_VALIDATION);
-                    int sessionExpirationInSeconds = config.optInt(AirlyticsConstants.JSON_SESSION_EXPIRATION_IN_SECONDS, 5);
-                    environment.update(enableClientSideValidation, sessionExpirationInSeconds, providerConfigs, eventConfigs);
-                }
-            }
-
-            Map<String, Object> userAttrs = getCalculatedUserAttributes();
-            if (!airlyticsEnvironmentsMap.isEmpty()) {
-                environment.setUserAttributes(userAttrs, airlyticsUserAttributesSchemaVersion);
-            }
-        }
-
-        if (airlyticsEnvironmentsMap.isEmpty()) {
-            airlyticsEnabled.set(false);
-            return;
-        }
-
-        if (airlyticsJustInitialized) {
-            Feature locationChangedFeature = AirlockManager.getInstance().getFeature(AirlyticsConstants.LOCATION_CHANGED_FEATURE);
-
-            if (locationChangedFeature.isOn()){
-                JSONObject configuration = locationChangedFeature.getConfiguration();
-                if (configuration != null) {
-                    AL.Companion.enableLocationTracking(locationChangedFeature.getConfiguration().optInt("precision", DEFAULT_LOCATION_PRECISION), locationChangedFeature.getConfiguration().optInt("intervalSeconds", DEFAULT_LOCATION_INTERVAL));
-                }
-            }
-            for (String eventName : airlyticsPendingEvents.keySet()) {
-                track(eventName, AIRLYTICS_STREAM_RESULT_SCHEMA_VERSION, airlyticsPendingEvents.get(eventName));
-            }
-            airlyticsPendingEvents.clear();
-        }
-    }
-
-    private Map<String, Object> getCalculatedUserAttributes() {
-        Map<String, Object> userAttributes = new HashMap<>();
-
-        userAttributes.put(AirlyticsConstants.DEV_USER_ATTRIBUTE, isDevUser.get());
-
-        Map<String, String> experimentInfo = getExperimentInfo();
-        String variant = null;
-        String experiment = null;
-        if (experimentInfo != null) {
-            variant = experimentInfo.get(Constants.JSON_FIELD_VARIANT);
-            experiment = experimentInfo.get(Constants.JSON_FIELD_EXPERIMENT);
-            //Do not send to airlytics empty values
-            if (variant.isEmpty()) {
-                variant = null;
-            }
-            if (experiment.isEmpty()) {
-                experiment = null;
-            }
-        }
-        userAttributes.put(AirlyticsConstants.VARIANT_ATTRIBUTE, variant);
-        userAttributes.put(AirlyticsConstants.EXPERIMENT_ATTRIBUTE, experiment);
-        return userAttributes;
-    }
-
-    private boolean isAirlyticsEnabled() {
-        return airlyticsEnabled.get();
     }
 
     @CheckForNull
@@ -336,46 +116,17 @@ public class AirlockManager extends BaseAirlockProductManager {
     @CheckForNull
     @Override
     public JSONArray addStreamsEvent(JSONArray events, boolean processImmediately) {
-        if (isAirlyticsEnabled() && !getFeature(AirlyticsConstants.USER_ATTRIBUTES_FEATURE).isOn()) {
-            return streamsManager.calculateAndSaveStreams(events, processImmediately, null, getContextFieldsForAnalytics(), new AirlockStreamResultsTracker() {
+        return streamsManager.calculateAndSaveStreams(events, processImmediately, null, getContextFieldsForAnalytics(), new AirlockStreamResultsTracker() {
                 @Override
                 public void trackResults(Map<String, Object> map) {
-                    track(AIRLYTICS_STREAM_RESULT_EVENT_NAME, AIRLYTICS_STREAM_RESULT_SCHEMA_VERSION, map);
+                    airlyticsImpl.trackStreamResults(map);
                 }
             });
-        } else {
-            return super.addStreamsEvent(events, processImmediately);
-        }
     }
 
+
     public void setAirlyticsUserAttributes(Map<String, Object> attributes, @Nullable String schemaVersion) {
-        if (!airlyticsEnabled.get()) {
-            return;
-        }
-
-        boolean switchedToDev = false;
-
-        if (!isDevUser.get()) {
-            Boolean devUser = (Boolean) attributes.get(AirlyticsConstants.DEV_USER_ATTRIBUTE);
-            if (devUser != null && devUser) {
-                isDevUser.set(true);
-                switchedToDev = true;
-            }
-        }
-
-        if (AirlockManager.userTags.isEmpty()) {
-            AirlockManager.userTags = getUserTags(attributes);
-        }
-
-        for (ALEnvironment environment : airlyticsEnvironmentsMap.values()) {
-            if (!Collections.disjoint(environment.getConfig().getTags(), AirlockManager.userTags)) {
-                environment.setUserAttributes(attributes, schemaVersion);
-            }
-        }
-
-        if (switchedToDev) {
-            updateAirlytics();
-        }
+        airlyticsImpl.setUserAttributes(attributes, schemaVersion);
     }
 
     public void setAirlyticsUserAttribute(String name, @Nullable Object value, @Nullable String schemaVersion) {
@@ -385,31 +136,7 @@ public class AirlockManager extends BaseAirlockProductManager {
     }
 
     public void sendAirlyticsEventsWhenGoingToBackground() {
-        for (ALEnvironment environment : airlyticsEnvironmentsMap.values()) {
-            environment.sendEventsWhenGoingToBackground();
-        }
-    }
-
-    private Set<String> getUserTags(@Nullable Map<String, Object> attributes) {
-        Set<String> userTags = new HashSet<>();
-        if (!isDevUser.get()) {
-            if (attributes != null) {
-                Boolean devUser = (Boolean) attributes.get(AirlyticsConstants.DEV_USER_ATTRIBUTE);
-                if (devUser != null) {
-                    isDevUser.set(devUser);
-                }
-            }
-            if (!getDeviceUserGroups().isEmpty()
-                    || !getDevelopBranchName().isEmpty()) {
-                isDevUser.set(true);
-            }
-        }
-        if (isDevUser.get()) {
-            userTags.add(DEV_TAG);
-        } else {
-            userTags.add(PROD_TAG);
-        }
-        return userTags;
+        airlyticsImpl.sendAnalyticsEventsWhenGoingToBackground();
     }
 
     public void track(String name, @Nullable String schemaVersion, Map<String, Object> attributes) {
@@ -417,30 +144,12 @@ public class AirlockManager extends BaseAirlockProductManager {
     }
 
     public void track(String name, @Nullable Long eventTime, @Nullable String schemaVersion, Map<String, Object> attributes) {
-        if (!airlyticsEnabled.get()) {
-            if (name.equals(AirlyticsConstants.APP_LAUNCH_EVENT) || name.equals(AirlyticsConstants.FIRST_TIME_LAUNCH_EVENT) || name.equals(AirlyticsConstants.NOTIFICATION_INTERACTED_EVENT)) {
-                persistAirlyticsAppStart(name, attributes);
-            }
-            return;
-        }
-        if (eventTime == null) {
-            eventTime = System.currentTimeMillis();
-        }
-        for (ALEnvironment environment : airlyticsEnvironmentsMap.values()) {
-            if (!Collections.disjoint(environment.getConfig().getTags(), userTags)) {
-                ALEvent event = new ALEvent(name, attributes, eventTime, environment, schemaVersion);
-                environment.track(event);
-            }
-        }
+        airlyticsImpl.track(name, eventTime, schemaVersion, attributes);
     }
 
     @SuppressWarnings("WeakerAccess")
     public void track(String name, Map<String, Object> attributes) {
         track(name, null, attributes);
-    }
-
-    private void persistAirlyticsAppStart(String name, Map<String, Object> attributes) {
-        airlyticsPendingEvents.put(name, attributes);
     }
 
     /**
@@ -516,7 +225,7 @@ public class AirlockManager extends BaseAirlockProductManager {
             List userGroups = getDeviceUserGroups();
             isDevUser.set(userGroups.size() > 0 || !getDevelopBranchName().isEmpty());
         }
-        updateAirlytics();
+        airlyticsImpl.syncAnalytics();
         init = true;
     }
 
@@ -539,7 +248,7 @@ public class AirlockManager extends BaseAirlockProductManager {
     }
 
     public void enableAirlytics(){
-        AirlockManager.disableAirlyticsLifecycle.set(false);
+        airlyticsImpl.enableAnalyticsLifecycle(true);
     }
 
 
@@ -575,49 +284,21 @@ public class AirlockManager extends BaseAirlockProductManager {
 
     @Override
     public Feature calculateFeatures(@Nullable JSONObject context, String locale) {
-        sendContextUserAttributesToAirlytics(context);
+        airlyticsImpl.sendContextAsUserAttributes(context);
         return new Feature();
     }
 
     @Override
     public void calculateFeatures(@Nullable JSONObject context, Collection<String> purchasedProducts) throws AirlockNotInitializedException, JSONException {
+        airlyticsImpl.addAnalyticsShardToContext(context);
         super.calculateFeatures(context, purchasedProducts);
-        sendContextUserAttributesToAirlytics(context);
+        airlyticsImpl.sendContextAsUserAttributes(context);
     }
 
     public void calculateFeatures(@Nullable JSONObject userProfile, @Nullable JSONObject airlockContext) throws AirlockNotInitializedException, JSONException {
+        airlyticsImpl.addAnalyticsShardToContext(airlockContext);
         super.calculateFeatures(userProfile, airlockContext);
-        sendContextUserAttributesToAirlytics(airlockContext);
-    }
-
-    private void sendContextUserAttributesToAirlytics(@Nullable JSONObject airlockContext) {
-        if (airlockContext == null) {
-            return;
-        }
-        JSONObject airlyticsContext = airlockContext.optJSONObject(AirlyticsConstants.JSON_AIRLYTICS);
-        if (airlockContext != null) {
-            Map<String, Object> userAttributes = new HashMap();
-            if (airlyticsContext != null) {
-                Iterator<?> keys = airlyticsContext.keys();
-                while (keys.hasNext()) {
-                    String key = (String) keys.next();
-                    Object value = airlyticsContext.opt(key);
-                    if (value != null) {
-                        userAttributes.put(key, value);
-                    }
-                }
-            }
-            if (getFeature(AirlyticsConstants.USER_ATTRIBUTES_FEATURE).isOn()){
-                Map analyticsFields = getContextFieldsValuesForAirlyticsAsMap(airlockContext);
-
-                if (!analyticsFields.isEmpty()){
-                    userAttributes.putAll(analyticsFields);
-                }
-                if (!userAttributes.isEmpty()) {
-                    setAirlyticsUserAttributes(userAttributes, airlyticsUserAttributesSchemaVersion);
-                }
-            }
-        }
+        airlyticsImpl.sendContextAsUserAttributes(airlockContext);
     }
 
     private void resetRuntime(com.ibm.airlock.common.cache.Context context) {
@@ -725,8 +406,8 @@ public class AirlockManager extends BaseAirlockProductManager {
     @SuppressWarnings("unused")
     public synchronized void initSDK(Context appContext, int defaultFileId, String productVersion, boolean isDevUser, boolean disableAirlyticsLifeCycle, String airlyticsUserAttrVersion) throws AirlockInvalidFileException, IOException {
         AirlockManager.isDevUser.set(isDevUser);
-        AirlockManager.disableAirlyticsLifecycle.set(disableAirlyticsLifeCycle);
-        AirlockManager.airlyticsUserAttributesSchemaVersion = airlyticsUserAttrVersion;
+        airlyticsImpl.enableAnalyticsLifecycle(!disableAirlyticsLifeCycle);
+        airlyticsImpl.setUserAttributesSchemaVersion(airlyticsUserAttrVersion);
         initSDK(new AndroidContext(appContext), defaultFileId, productVersion);
     }
 
@@ -761,7 +442,7 @@ public class AirlockManager extends BaseAirlockProductManager {
      */
     public synchronized void initSDK(Context appContext, int defaultFileId, String productVersion, Activity mainActivity) throws AirlockInvalidFileException, IOException {
         AndroidContext context = new AndroidContext(appContext);
-        disableAirlyticsLifecycle.set(false);
+        airlyticsImpl.enableAnalyticsLifecycle(true);
         initSDK(context, FileUtil.readAndroidFile(defaultFileId, context), productVersion, "", mainActivity);
     }
 
@@ -798,22 +479,6 @@ public class AirlockManager extends BaseAirlockProductManager {
         return map;
     }
 
-    public Map<String, Object> getContextFieldsValuesForAirlyticsAsMap(JSONObject contextObject) {
-
-        Map<String, Object> map = new HashMap<>();
-        JSONObject calculatedFeatures = this.getContextFieldsValuesForAnalytics(contextObject, false);
-        if (calculatedFeatures != null) {
-            Iterator<String> keysItr = calculatedFeatures.keys();
-            while (keysItr.hasNext()) {
-                String key = keysItr.next();
-                Object value = calculatedFeatures.opt(key);
-                key = key.replace("context.streams.", "streams.");
-                map.put(key, value);
-            }
-        }
-        return map;
-    }
-
     public void resetRuntime(Context context) {
         resetRuntime(new AndroidContext(context));
     }
@@ -822,53 +487,6 @@ public class AirlockManager extends BaseAirlockProductManager {
     // simulate uninstall.
     public void reset(Context context, boolean simulateUninstall) {
         reset(new AndroidContext(context), simulateUninstall);
-    }
-
-    @CheckForNull
-    public ALEnvironment getAirlyticsEnvironment(@Nullable String name) {
-        if (name == null) {
-            return null;
-        }
-        return AL.Companion.getEnvironment(name);
-    }
-
-    @CheckForNull
-    public String getSessionDetails(String featureName) {
-        String sessionDetails = null;
-        JSONObject config = getSessionDetailsFeatureConfig(featureName);
-        if (config == null) {
-            return null;
-        }
-        String key = config.optString(Constants.ADS_KEY);
-        byte[] details = null;
-        int detailsLength = 0;
-
-        JSONArray sessionDetailsFields = config.optJSONArray(Constants.ADS_SESSION_DETAILS_ARRAY);
-        if (sessionDetailsFields == null) {
-            return null;
-        }
-        ALEnvironment currentEnvironment = null;
-
-        for (ALEnvironment environment : airlyticsEnvironmentsMap.values()) {
-            if (!Collections.disjoint(environment.getConfig().getTags(), userTags)) {
-                currentEnvironment = environment;
-                break;
-            }
-        }
-        if (currentEnvironment == null) {
-            return null;
-        }
-
-        byte[] detailBytes = getDetailsAsByteArray(sessionDetailsFields, currentEnvironment);
-
-        if (detailBytes == null) {
-            return null;
-        }
-
-        byte[] cipherText = AesGcmEncryptionUtil.INSTANCE.encrypt(key.getBytes(StandardCharsets.UTF_8), detailBytes, false);
-
-        return com.google.common.io.BaseEncoding.base32().lowerCase().encode(cipherText).replaceAll("=","-");
-
     }
 
     private JSONObject getSessionDetailsFeatureConfig(String featureName){
@@ -886,7 +504,7 @@ public class AirlockManager extends BaseAirlockProductManager {
         if (config == null){
             return result;
         }
-        String encodedCipherText = getSessionDetails(featureName);
+        String encodedCipherText = airlyticsImpl.getSessionDetails(featureName);
         if (encodedCipherText == null){
             return result;
         }
@@ -900,66 +518,6 @@ public class AirlockManager extends BaseAirlockProductManager {
         return result;
     }
 
-    @CheckForNull
-    private byte[] getDetailsAsByteArray(JSONArray sessionDetailsFields, ALEnvironment currentEnvironment) {
-        final int BYTE_SIZE = 8;
-        int detailsSize = 0;
-        Map<String, Object> fieldsMap = new HashMap<>();
-
-        String airlockId;
-        try {
-            airlockId = getAirlockUserUniqueId();
-        } catch (AirlockNotInitializedException e) {
-            Logger.log.d(TAG, AirlockMessages.ERROR_SDK_NOT_INITIALIZED);
-            return null;
-        }
-
-        //because the order of the fields is important - we can not add the values to byte array immediately
-        for (int i = 0; i < sessionDetailsFields.length(); i++) {
-            String field = sessionDetailsFields.optString(i);
-            switch (field) {
-                case Constants.ADS_AIRLOCK_ID:
-                    detailsSize += BYTE_SIZE * 2;
-                    fieldsMap.put(field, UUID.fromString(airlockId));
-                    break;
-                case Constants.ADS_SESSION_ID:
-                    detailsSize += BYTE_SIZE * 2;
-                    fieldsMap.put(field, currentEnvironment.getSessionId());
-                    break;
-                case Constants.ADS_SESSION_START_TIME:
-                    detailsSize += BYTE_SIZE;
-                    fieldsMap.put(field, currentEnvironment.getSessionStartTime());
-                    break;
-            }
-        }
-        if (detailsSize < 1) {
-            return null;
-        }
-        ByteBuffer detailsByteBuffer = ByteBuffer.wrap(new byte[detailsSize+1]);
-
-        Byte mode = 0;
-        if (isDevUser.get()){
-            mode = 1;
-        }
-        detailsByteBuffer.put(mode);
-        String[] uuidFields = {Constants.ADS_AIRLOCK_ID, Constants.ADS_SESSION_ID};
-        for (String field : uuidFields) {
-            UUID uuid = (UUID) fieldsMap.get(field);
-            if (uuid != null) {
-                detailsByteBuffer.putLong(uuid.getMostSignificantBits());
-                detailsByteBuffer.putLong(uuid.getLeastSignificantBits());
-            }
-        }
-        if (fieldsMap.containsKey(Constants.ADS_SESSION_START_TIME)) {
-            Long startTime = (Long) fieldsMap.get(Constants.ADS_SESSION_START_TIME);
-            if (startTime != null) {
-                detailsByteBuffer.putLong(startTime);
-            }
-        }
-        return detailsByteBuffer.array();
-
-    }
-
     /**
      * Specifies a list of user groups selected for the device.
      *
@@ -970,22 +528,26 @@ public class AirlockManager extends BaseAirlockProductManager {
         super.setDeviceUserGroups(userGroups);
         isDevUser.set(true);
         Map<String, Object> userAttributes = new HashMap<>();
-        userAttributes.put(AirlyticsConstants.DEV_USER_ATTRIBUTE, true);
-        setAirlyticsUserAttributes(userAttributes, airlyticsUserAttributesSchemaVersion);
+        userAttributes.put(airlyticsImpl.getAnalyticsFeatureName(AnalyticsApiInterface.ConstantsKeys.DEV_USER_ATTRIBUTE), true);
+        airlyticsImpl.setUserAttributes(userAttributes, airlyticsImpl.getUserAttributesSchemaVersion());
     }
 
     @Override
     public String resetAirlockId() {
         String newUUID = super.resetAirlockId();
-        AL.Companion.updateUserId(newUUID);
+        airlyticsImpl.updateUserId(newUUID);
         return newUUID;
     }
 
     public void verifyAirlyticsState() {
-        AL.Companion.verifyLifecycleStarted();
+        airlyticsImpl.verifyAnalyticsState();
     }
 
     public Context getApplicationContext() {
         return applicationContext;
+    }
+
+    public AnalyticsDefaultImpl getAnalyticsImpl() {
+        return airlyticsImpl;
     }
 }
