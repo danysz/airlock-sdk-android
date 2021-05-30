@@ -200,6 +200,12 @@ The project consists if three submodules
    ./gradlew sdk:build
 ```
 
+3. You can use sdk Android library AAR file and include is statically to you App for
+   and use as a local build.
+
+4. The alternative is to use the official state build from Maven Center
+   Use the sdkSample as a reference to see how the typical Airlock SDK integration could be done
+
 
 ## API documentation
 Click here for [Airlock API Javadoc documentation](http://androidbuildserver:8080/job/airlock%20sdk/javadoc/).
