@@ -174,15 +174,14 @@ try {
 }
 ````
 ## Build
-Do the following steps to build the project locally:
-The lasted code is tested using Android Studio 4.2.1 version
-The project consists if three submodules
+To use the Airlock SDK you do not have to build it yourself. However, if you'd like to, follow these steps to build the project locally:
+The project consists of three submodules
 
 - airlock-sdk-common
 - sdk
 - sdkSample
 
-1. Clone the project (note, the project is has submodule dependency)
+1. Clone the project (note, the project has a submodule dependency)
 
 ```
    git clone https://github.com/IBM/airlock-sdk-android.git
