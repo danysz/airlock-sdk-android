@@ -206,7 +206,5 @@ The project consists of three submodules
 Click here for [Airlock API Javadoc documentation](http://androidbuildserver:8080/job/airlock%20sdk/javadoc/).
 
 ## License
+MIT License, see [LICENSE](https://github.com/IBM/airlock-sdk-android/blob/master/LICENSE).
 
-Apache License 2.0, see [LICENSE](https://github.com/IBM/cloudland/blob/master/LICENSE).
-
-Visit [doc](https://github.com/IBM/cloudland/tree/master/doc) for full documentation and guide.
