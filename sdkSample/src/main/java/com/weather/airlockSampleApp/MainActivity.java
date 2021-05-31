@@ -52,7 +52,6 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-
     private static final int RESULT_SETTINGS = 1;
     private static final String TAG = "MAIN AIRLOCK TEST APP";
     private int defaultFileId;
@@ -62,13 +61,22 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        // replace airlock_defaults with the default file of our Airlock project
+        // The default file could be downloaded from the Airlock Console (Product administration section)
         defaultFileId = R.raw.airlock_defaults;
+        if (readRawTextFile(getBaseContext(), R.raw.airlock_defaults).equals("{}")) {
+            Context context = getApplicationContext();
+            CharSequence text = "Airlock defaults file is missing, pls follow the documentation to specify it";
+            int duration = Toast.LENGTH_SHORT;
+
+            Toast toast = Toast.makeText(context, text, duration);
+            toast.show();
+            return;
+        }
 
         try {
-            AirlockManager.getInstance().initSDK(getApplicationContext(), defaultFileId, "10.25", this);
+            AirlockManager.getInstance().initSDK(getApplicationContext(), defaultFileId, "1.0.0", this);
             AirlockManager.getInstance().getNotificationsManager().setSupported(true);
-
-            //AirlockManager.getInstance().getPurchasesManager().
         } catch (Exception e) {
             Log.e(TAG, "Failed to init exit app ", e);
             finish();
@@ -406,5 +414,21 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "Map = " + featureList);
             }
         });
+    }
+
+    public static String readRawTextFile(Context ctx, int resId) {
+        InputStream inputStream = ctx.getResources().openRawResource(resId);
+        InputStreamReader inputReader = new InputStreamReader(inputStream);
+        BufferedReader buffReader = new BufferedReader(inputReader);
+        String line;
+        StringBuilder text = new StringBuilder();
+        try {
+            while ((line = buffReader.readLine()) != null) {
+                text.append(line);
+            }
+        } catch (IOException e) {
+            return null;
+        }
+        return text.toString();
     }
 }
