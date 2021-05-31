@@ -37,24 +37,21 @@ Do the following steps to integrate the Airlock SDK with your Android project:
 
 1. Add the Airlock defaults file to your project.
    The defaults file contains the list of features that the SDK uses in the case information on those features is not available on the server.
-   The defaults file, as a JSON file, can be downloaded via Airlock Console UI
+   The defaults file in JSON format can be downloaded via Airlock Console UI
    from the product administration section.
 
 ## SDK Overview
 ![](SDK.jpg)
 
-The master list of features and configuration rules are stored on the Airlock server (AWS S3).  
-Each feature definition includes rules that determine when the feature is enabled based the user profile,  
-device context (locale, location, device type, etc.), and weather conditions.  
-An application that uses the Airlock SDK provides the user profile, device context information,  
-and weather data to the SDK. The SDK runs rules on that information and determines which features are on or off,  
-and which output configurations are applied.  
-In case of error or when feature and configuration information is not available on the server,  
-the defaults file is used.
+The master list of features and configuration rules are stored on the Airlock server.  
+Each feature definition includes rules that determine when the feature is enabled based on application context such as
+device context (locale, location, device type, etc.), or any other input provided to the SDK by the application. 
+The SDK runs the Airlock rules on the context and determines which features are on or off, and which output configurations are applied.  
+In case of error or when feature and configuration information is not available on the server, the defaults file is used.
 
 ## Usage
 
-To use the Airlock SDK, follow these steps:
+After you've included the defaults file in your project, to use the Airlock SDK follow these steps:
 
 1. Initialize the SDK by calling the **initSDK** method. This method loads the defaults file and any previously stored information from the server. You supply the product version and defaults file to this method.
 
@@ -62,23 +59,21 @@ To use the Airlock SDK, follow these steps:
 
 3. Calculate the pull results by calling the **calculateFeatures** method. You supply the following information to this method:
 
-	* The device context (a single JSON string that includes the locale, location, device type, etc.)
+	* The application context (a single JSON string that includes the input the rules will run on. You can add any field such as locale, location, user profile data etc.)
 	
-	The **calculateFeatures** method determines whether the features are enabled based on the method’s input, and evaluates the feature’s configuration rules. No feature status changes are exposed until the **syncFeatures** method is called.
+	The **calculateFeatures** method determines whether the features are enabled based on the method’s input, and evaluates the feature’s configuration rules. Note: No feature status change will be exposed until the **syncFeatures** method is called.
 
 3. Make the current feature list available to the code by calling the **syncFeatures** method.
  
 4. Use the **getFeature(feature_name).isOn** method to determine whether a feature is on or off.
 	
-	A condition statement surrounds every code block that is air-locked. The condition causes the block to run if the feature is enabled:
+	A condition statement surrounds every code block that is 'Airlocked'. The condition causes the block to run if the feature is enabled:
 
 	````
 	if (AirlockManager.getInstance().getFeature("feature_name").isOn()) {
 	    printMap();
 	}
 	````
-	
-	**Tip**: Use the Airlock Code Assistant plugin for Android Studio to easily associate code snippets with specific features. For more information, see the [Airlock Code Assistant Readme](https://github.com/TheWeatherCompany/airlock-documentation/blob/master/README-for-airlock-ide-android/README.md).
 
 5. Use the **getFeature(feature_name).getConfiguration** method to get the feature's configuration in JSON format.
 
@@ -90,8 +85,9 @@ To use the Airlock SDK, follow these steps:
 	AirlockManager.getInstance().getRootFeatures()
 	````
 
-## Setting device user groups
-In development only, you specify user groups that are associated with features. Each feature is associated with one or more user groups. The SDK provides a user interface that allows you to associate your device with these user groups.
+## Adding the Debug UI and setting device user groups
+The Airlock SDK provides a useful user interface for development purposes, showing a wide range of information as well as allowing debug actions.
+Especially important are 'feature groups'. While features are in development mode, feature are exposed through 'user groups' that are associated with features. The user interface provided by the SDK allows development users to associate their device with these user groups, so that they can view the features as ON, without exposing the features in production. Without setting user groups in the Airlock console, and in the app, no feature in the 'development' stage will be visible to the application.
 
 ![](UserGroups.jpg)
 
