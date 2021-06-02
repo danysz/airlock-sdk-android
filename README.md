@@ -1,7 +1,8 @@
 # Airlock SDK for Android
 The Airlock SDK determines which features are enabled for a particular application based on  
 the user profile and device context (locale, location, device type, etc.).
-
+## Stable Version
+5.4.1
 ## System Requirements
 * Android SDK version 16 or later
 
@@ -192,6 +193,7 @@ The project consists of three submodules
 
 2. To build the SDK ARR use
 ```
+   ./gradlew airlock-sdk-common:build
    ./gradlew sdk:build
 ```
 
