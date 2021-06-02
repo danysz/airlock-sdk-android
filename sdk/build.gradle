@@ -6,7 +6,7 @@ apply plugin: 'maven'
 apply plugin: 'signing'
 
 ext {
-    SNAPSHOT = true
+    SNAPSHOT = false
     BUILD_NUMBER = System.getenv("BUILD_NUMBER") ?: devBuildNumber
     VERSION_MICRO_BUILD_NUMBER = project.hasProperty("releaseMicroBuildNumber") ? releaseMicroBuildNumber : 0
 
@@ -215,9 +215,7 @@ project.gradle.taskGraph.whenReady {
     }
 }
 
-signArchives.enabled = false
-uploadArchives.enabled = false
-uploadArchives.finalizedBy(signing)
+
 
 uploadArchives {
     repositories {
