@@ -11,7 +11,7 @@ Do the following steps to integrate the Airlock SDK with your Android project:
 
 1. Open the `build.gradle` file of your project and add the following line to the `dependencies` code section:							
 	
-	`compile "com.weather.android.airlock:airlock-sdk-android:<version>"`
+	`implementation "com.weather.android.airlock:airlock-sdk-android:<version>"`
 
 	Here is a sample code snippet of `build.gradle` file:
 	````
@@ -32,7 +32,7 @@ Do the following steps to integrate the Airlock SDK with your Android project:
 	dependencies {
 	.....
 	  //airlock
-	  compile "com.weather.android.airlock:airlock-sdk-android:<version>"
+	  implementation "com.weather.android.airlock:airlock-sdk-android:<version>"
 	}
 	````
 
