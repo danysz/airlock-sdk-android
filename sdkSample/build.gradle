@@ -7,10 +7,6 @@ allprojects {
     repositories {
         mavenCentral()
         google()
-        flatDir {
-            dirs '../sdk/build/outputs/aar/'
-        }
-        maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
     }
 }
 
@@ -19,7 +15,6 @@ buildscript {
         jcenter()
         google()
         mavenCentral()
-        maven { url 'https://oss.sonatype.org/content/repositories/snapshots' }
     }
 
     dependencies {
@@ -73,7 +68,7 @@ dependencies {
     implementation 'androidx.appcompat:appcompat:1.0.0'
     implementation 'com.squareup.okhttp3:okhttp:3.4.1'
     implementation 'com.squareup.okhttp3:okhttp-urlconnection:3.4.1'
-    implementation ( 'com.weather.android:airlock-sdk-android:5.4.3-SNAPSHOT@aar')
+    implementation ( 'com.weather.android:airlock-sdk-android:5.4.1@aar')
     testImplementation 'org.robolectric:robolectric:3.1.2'
     testImplementation 'org.khronos:opengl-api:gl1.1-android-2.1_r1'
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
